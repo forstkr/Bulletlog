@@ -51,6 +51,8 @@ export default function App() {
     createEntry,
     toggleTaskStatus,
     togglePriority,
+    setEntryIndent,
+    toggleCancelled,
     reorderEntries,
     updateEntryContent,
     migrateEntry,
@@ -212,9 +214,10 @@ export default function App() {
       dateKey: string,
       type: BulletType,
       rawText: string,
-      priority?: boolean
+      priority?: boolean,
+      indent?: 0 | 1
     ) => {
-      await createEntry({ scope, dateKey, type, rawText, priority });
+      await createEntry({ scope, dateKey, type, rawText, priority, indent });
     },
     [createEntry]
   );
@@ -464,6 +467,8 @@ export default function App() {
                 onCreateEntry={handleCreateEntry}
                 onToggleTask={toggleTaskStatus}
                 onTogglePriority={togglePriority}
+                onSetIndent={setEntryIndent}
+                onToggleCancelled={toggleCancelled}
                 onUpdateText={updateEntryContent}
                 onMigrate={handleMigrate}
                 onSchedule={handleSchedule}
@@ -481,6 +486,8 @@ export default function App() {
                 onCreateEntry={handleCreateEntry}
                 onToggleTask={toggleTaskStatus}
                 onTogglePriority={togglePriority}
+                onSetIndent={setEntryIndent}
+                onToggleCancelled={toggleCancelled}
                 onUpdateText={updateEntryContent}
                 onMigrate={handleMigrate}
                 onSchedule={handleSchedule}
@@ -502,6 +509,8 @@ export default function App() {
                 onCreateEntry={handleCreateEntry}
                 onToggleTask={toggleTaskStatus}
                 onTogglePriority={togglePriority}
+                onSetIndent={setEntryIndent}
+                onToggleCancelled={toggleCancelled}
                 onUpdateText={updateEntryContent}
                 onMigrate={handleMigrate}
                 onMigrateMultiple={handleMigrateMultiple}

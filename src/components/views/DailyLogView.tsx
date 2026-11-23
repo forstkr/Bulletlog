@@ -37,10 +37,13 @@ interface DailyLogViewProps {
     dateKey: string,
     type: BulletType,
     rawText: string,
-    priority?: boolean
+    priority?: boolean,
+    indent?: 0 | 1
   ) => Promise<void>;
   onToggleTask: (entry: JournalEntry) => Promise<void>;
   onTogglePriority: (entry: JournalEntry) => Promise<void>;
+  onSetIndent: (entry: JournalEntry, indent: 0 | 1) => Promise<void>;
+  onToggleCancelled: (entry: JournalEntry) => Promise<void>;
   onUpdateText: (entry: JournalEntry, rawText: string) => Promise<void>;
   onMigrate: (
     entry: JournalEntry,
@@ -66,6 +69,8 @@ export function DailyLogView({
   onCreateEntry,
   onToggleTask,
   onTogglePriority,
+  onSetIndent,
+  onToggleCancelled,
   onUpdateText,
   onMigrate,
   onMigrateMultiple,
@@ -203,8 +208,8 @@ export function DailyLogView({
       <section className="mb-8" aria-label="빠른 입력">
         <RapidInput
           showHints
-          onSubmit={(type, rawText, priority) =>
-            onCreateEntry('daily', dateKey, type, rawText, priority)
+          onSubmit={(type, rawText, priority, indent) =>
+            onCreateEntry('daily', dateKey, type, rawText, priority, indent)
           }
         />
       </section>
@@ -234,6 +239,8 @@ export function DailyLogView({
                 highlighted={highlightId === entry.id}
                 onToggleTask={onToggleTask}
                 onTogglePriority={onTogglePriority}
+                onSetIndent={onSetIndent}
+                onToggleCancelled={onToggleCancelled}
                 onUpdateText={onUpdateText}
                 onMigrate={onMigrate}
                 onSchedule={onSchedule}

@@ -23,10 +23,13 @@ interface FutureLogViewProps {
     dateKey: string,
     type: BulletType,
     rawText: string,
-    priority?: boolean
+    priority?: boolean,
+    indent?: 0 | 1
   ) => Promise<void>;
   onToggleTask: (entry: JournalEntry) => Promise<void>;
   onTogglePriority: (entry: JournalEntry) => Promise<void>;
+  onSetIndent: (entry: JournalEntry, indent: 0 | 1) => Promise<void>;
+  onToggleCancelled: (entry: JournalEntry) => Promise<void>;
   onUpdateText: (entry: JournalEntry, rawText: string) => Promise<void>;
   onMigrate: (
     entry: JournalEntry,
@@ -45,6 +48,8 @@ export function FutureLogView({
   onCreateEntry,
   onToggleTask,
   onTogglePriority,
+  onSetIndent,
+  onToggleCancelled,
   onUpdateText,
   onMigrate,
   onSchedule,
@@ -175,6 +180,8 @@ export function FutureLogView({
                         highlighted={highlightId === entry.id}
                         onToggleTask={onToggleTask}
                         onTogglePriority={onTogglePriority}
+                        onSetIndent={onSetIndent}
+                        onToggleCancelled={onToggleCancelled}
                         onUpdateText={onUpdateText}
                         onMigrate={onMigrate}
                         onSchedule={onSchedule}
@@ -191,8 +198,15 @@ export function FutureLogView({
                 <RapidInput
                   compact
                   placeholder={`${formatMonthHeading(monthKey)} 항목 추가...`}
-                  onSubmit={(type, rawText, priority) =>
-                    onCreateEntry('future', monthKey, type, rawText, priority)
+                  onSubmit={(type, rawText, priority, indent) =>
+                    onCreateEntry(
+                      'future',
+                      monthKey,
+                      type,
+                      rawText,
+                      priority,
+                      indent
+                    )
                   }
                 />
               </div>

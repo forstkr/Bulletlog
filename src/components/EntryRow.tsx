@@ -4,9 +4,12 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  IndentDecrease,
+  IndentIncrease,
   MoreHorizontal,
   Pencil,
   Star,
+  Strikethrough,
   Trash2,
   X,
 } from 'lucide-react';
@@ -30,6 +33,8 @@ interface EntryRowProps {
   highlighted?: boolean;
   onToggleTask: (entry: JournalEntry) => void | Promise<void>;
   onTogglePriority: (entry: JournalEntry) => void | Promise<void>;
+  onSetIndent: (entry: JournalEntry, indent: 0 | 1) => void | Promise<void>;
+  onToggleCancelled: (entry: JournalEntry) => void | Promise<void>;
   onUpdateText: (entry: JournalEntry, rawText: string) => void | Promise<void>;
   onMigrate: (
     entry: JournalEntry,
@@ -55,6 +60,8 @@ export function EntryRow({
   highlighted = false,
   onToggleTask,
   onTogglePriority,
+  onSetIndent,
+  onToggleCancelled,
   onUpdateText,
   onMigrate,
   onSchedule,
@@ -69,8 +76,8 @@ export function EntryRow({
 }: EntryRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
+  const [trayOpen, setTrayOpen] = useState(false);
   const [activePanel, setActivePanel] = useState<ActivePanel>('none');
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isComposingRef = useRef(false);
   const editInputRef = useRef<HTMLInputElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
@@ -82,15 +89,29 @@ export function EntryRow({
   }, [isEditing]);
 
   useEffect(() => {
-    if (activePanel === 'none') return;
+    if (!trayOpen && activePanel === 'none') return;
+
     const handleOutside = (e: MouseEvent) => {
       if (rowRef.current && !rowRef.current.contains(e.target as Node)) {
+        setTrayOpen(false);
         setActivePanel('none');
       }
     };
+
+    const handleKeyDown = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setTrayOpen(false);
+        setActivePanel('none');
+      }
+    };
+
     document.addEventListener('mousedown', handleOutside);
-    return () => document.removeEventListener('mousedown', handleOutside);
-  }, [activePanel]);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [trayOpen, activePanel]);
 
   const startEdit = () => {
     const initial =
@@ -99,7 +120,7 @@ export function EntryRow({
         : entry.content;
     setEditValue(initial);
     setActivePanel('none');
-    setMobileMenuOpen(false);
+    setTrayOpen(false);
     setIsEditing(true);
   };
 
@@ -115,6 +136,7 @@ export function EntryRow({
     setIsEditing(false);
   };
 
+  const isIndented = entry.indent === 1;
   const reorderEnabled = Boolean(onMoveUp || onMoveDown);
 
   const triggerMoveWithFocus = (
@@ -139,7 +161,18 @@ export function EntryRow({
   };
 
   const handleEditKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (reorderEnabled && e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      e.stopPropagation();
+      const nextIndent: 0 | 1 = e.shiftKey ? 0 : isIndented ? 0 : 1;
+      void onSetIndent(entry, nextIndent);
+      return;
+    }
+    if (
+      reorderEnabled &&
+      e.altKey &&
+      (e.key === 'ArrowUp' || e.key === 'ArrowDown')
+    ) {
       e.preventDefault();
       e.stopPropagation();
       triggerMoveWithFocus(e.key === 'ArrowUp' ? 'up' : 'down', 'input');
@@ -156,33 +189,39 @@ export function EntryRow({
   };
 
   const handleRowKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (
-      !reorderEnabled ||
-      isEditing ||
-      !e.altKey ||
-      (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')
-    ) {
+    if (isEditing) return;
+
+    if (e.key === 'Tab' && e.target === rowRef.current) {
+      e.preventDefault();
+      const nextIndent: 0 | 1 = e.shiftKey ? 0 : isIndented ? 0 : 1;
+      void onSetIndent(entry, nextIndent);
       return;
     }
-    e.preventDefault();
-    triggerMoveWithFocus(e.key === 'ArrowUp' ? 'up' : 'down', 'row');
+
+    if (
+      reorderEnabled &&
+      e.altKey &&
+      (e.key === 'ArrowUp' || e.key === 'ArrowDown')
+    ) {
+      e.preventDefault();
+      triggerMoveWithFocus(e.key === 'ArrowUp' ? 'up' : 'down', 'row');
+    }
   };
 
   const migratedTarget = entry.migratedToId
     ? allEntries.find((item) => item.id === entry.migratedToId)
     : undefined;
 
-  const isFaded =
-    entry.status === 'migrated' ||
-    entry.status === 'scheduled' ||
-    entry.status === 'cancelled';
   const isDone = entry.type === 'task' && entry.status === 'done';
+  const isCancelled = entry.type === 'task' && entry.status === 'cancelled';
+  const isMigratedOrScheduled =
+    entry.status === 'migrated' || entry.status === 'scheduled';
   const canMigrateOrSchedule = entry.type === 'task' || entry.scope === 'future';
 
   const futureMonths = getFutureMonthKeys(12);
 
   const handleMigrateClick = () => {
-    setMobileMenuOpen(false);
+    setTrayOpen(false);
     if (entry.scope === 'future') {
       // Future Log -> directly migrate to that month's Monthly Log
       void onMigrate(entry, 'monthly', entry.dateKey);
@@ -192,7 +231,7 @@ export function EntryRow({
   };
 
   const handleScheduleClick = () => {
-    setMobileMenuOpen(false);
+    setTrayOpen(false);
     setActivePanel((prev) => (prev === 'schedule' ? 'none' : 'schedule'));
   };
 
@@ -205,12 +244,17 @@ export function EntryRow({
     : null;
 
   const isDraggable =
-    Boolean(dragProps?.draggable) && !isEditing && activePanel === 'none';
+    Boolean(dragProps?.draggable) &&
+    !isEditing &&
+    !trayOpen &&
+    activePanel === 'none';
+
+  const isMenuActive = trayOpen || activePanel !== 'none';
 
   return (
     <div
       ref={rowRef}
-      tabIndex={reorderEnabled ? 0 : undefined}
+      tabIndex={0}
       onKeyDown={handleRowKeyDown}
       draggable={isDraggable}
       onDragStart={isDraggable ? dragProps?.onDragStart : undefined}
@@ -238,249 +282,160 @@ export function EntryRow({
         />
       )}
 
-      <div
-        className={`flex items-start gap-2 ${
-          compact ? 'py-1.5 px-1' : 'py-2 px-1.5'
-        }`}
-      >
-        <BulletGlyph
-          type={entry.type}
-          status={entry.status}
-          interactive={entry.type === 'task'}
-          onClick={() => void onToggleTask(entry)}
-        />
+      {/* 1-level indent wrapper (pl-7 matches parent BulletGlyph w-7) */}
+      <div className={isIndented ? 'pl-7' : ''}>
+        <div
+          className={`flex items-start gap-2 ${
+            compact ? 'py-1.5 px-1' : 'py-2 px-1.5'
+          }`}
+        >
+          <BulletGlyph
+            type={entry.type}
+            status={entry.status}
+            interactive={entry.type === 'task'}
+            onClick={() => void onToggleTask(entry)}
+          />
 
-        <div className="flex-1 min-w-0">
-          {isEditing ? (
-            <div className="flex items-center gap-1.5 -my-1">
-              <input
-                ref={editInputRef}
-                type="text"
-                value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
-                onKeyDown={handleEditKeyDown}
-                onCompositionStart={() => {
-                  isComposingRef.current = true;
-                }}
-                onCompositionEnd={() => {
-                  isComposingRef.current = false;
-                }}
-                className="flex-1 min-w-0 rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-[15px] leading-6 text-zinc-900 focus:border-zinc-500 focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={() => void commitEdit()}
-                aria-label="수정 저장"
-                className="flex items-center justify-center w-10 h-10 md:w-8 md:h-8 shrink-0 rounded-md bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
-              >
-                <Check className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={cancelEdit}
-                aria-label="수정 취소"
-                className="flex items-center justify-center w-10 h-10 md:w-8 md:h-8 shrink-0 rounded-md border border-zinc-200 text-zinc-600 hover:bg-zinc-100 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          ) : (
-            <div
-              onDoubleClick={startEdit}
-              className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 break-words"
-            >
-              {entry.type === 'event' && entry.eventTime && (
-                <span className="font-mono tabular-nums text-xs leading-6 font-medium text-zinc-500">
-                  {entry.eventTime}
-                </span>
-              )}
-              <span
-                className={`text-[15px] leading-6 ${
-                  isDone
-                    ? 'line-through text-zinc-400'
-                    : isFaded
-                      ? 'text-zinc-400'
-                      : entry.priority
-                        ? 'font-medium text-neutral-950'
-                        : entry.type === 'note'
-                          ? 'text-zinc-600'
-                          : 'text-zinc-900'
-                }`}
-              >
-                {entry.priority && (
-                  <span className="text-amber-600 font-semibold mr-1">*</span>
-                )}
-                {entry.content}
-              </span>
-              {migratedTarget && migratedTargetLabel && onNavigate && (
+          <div className="flex-1 min-w-0">
+            {isEditing ? (
+              <div className="flex items-center gap-1.5 -my-1">
+                <input
+                  ref={editInputRef}
+                  type="text"
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  onKeyDown={handleEditKeyDown}
+                  onCompositionStart={() => {
+                    isComposingRef.current = true;
+                  }}
+                  onCompositionEnd={() => {
+                    isComposingRef.current = false;
+                  }}
+                  className="flex-1 min-w-0 rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-[15px] leading-6 text-zinc-900 focus:border-zinc-500 focus:outline-none"
+                />
                 <button
                   type="button"
-                  onClick={() =>
-                    onNavigate({
-                      view: migratedTarget.scope,
-                      dateKey: migratedTarget.dateKey,
-                      highlightId: migratedTarget.id,
-                    })
-                  }
-                  className="text-xs leading-6 text-zinc-400 hover:text-zinc-700 hover:underline transition-colors whitespace-nowrap"
+                  onClick={() => void commitEdit()}
+                  aria-label="수정 저장"
+                  className="flex items-center justify-center w-10 h-10 md:w-8 md:h-8 shrink-0 rounded-md bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
                 >
-                  {entry.status === 'scheduled' ? '← ' : '→ '}
-                  {migratedTargetLabel}
+                  <Check className="w-4 h-4" />
                 </button>
-              )}
+                <button
+                  type="button"
+                  onClick={cancelEdit}
+                  aria-label="수정 취소"
+                  className="flex items-center justify-center w-10 h-10 md:w-8 md:h-8 shrink-0 rounded-md border border-zinc-200 text-zinc-600 hover:bg-zinc-100 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div
+                onDoubleClick={startEdit}
+                className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 break-words"
+              >
+                {entry.type === 'event' && entry.eventTime && (
+                  <span className="font-mono tabular-nums text-xs leading-6 font-medium text-zinc-500">
+                    {entry.eventTime}
+                  </span>
+                )}
+                <span
+                  className={`text-[15px] leading-6 ${
+                    isCancelled
+                      ? 'line-through decoration-neutral-400 text-neutral-400'
+                      : isDone
+                        ? 'line-through text-zinc-400'
+                        : isMigratedOrScheduled
+                          ? 'text-zinc-400'
+                          : entry.priority
+                            ? 'font-medium text-neutral-950'
+                            : entry.type === 'note'
+                              ? 'text-zinc-600'
+                              : 'text-zinc-900'
+                  }`}
+                >
+                  {entry.priority && (
+                    <span
+                      className={`font-semibold mr-1 ${
+                        isCancelled || isDone || isMigratedOrScheduled
+                          ? 'text-neutral-400'
+                          : 'text-amber-600'
+                      }`}
+                    >
+                      *
+                    </span>
+                  )}
+                  {entry.content}
+                </span>
+                {migratedTarget && migratedTargetLabel && onNavigate && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onNavigate({
+                        view: migratedTarget.scope,
+                        dateKey: migratedTarget.dateKey,
+                        highlightId: migratedTarget.id,
+                      })
+                    }
+                    className="text-xs leading-6 text-zinc-400 hover:text-zinc-700 hover:underline transition-colors whitespace-nowrap"
+                  >
+                    {entry.status === 'scheduled' ? '← ' : '→ '}
+                    {migratedTargetLabel}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Unified minimal ⋯ trigger button (desktop & mobile) */}
+          {!isEditing && (
+            <div className="flex items-center h-6 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  if (activePanel !== 'none') {
+                    setActivePanel('none');
+                    setTrayOpen(true);
+                  } else {
+                    setTrayOpen((prev) => !prev);
+                  }
+                }}
+                aria-label="항목 작업 메뉴"
+                aria-expanded={isMenuActive}
+                title="항목 작업 메뉴"
+                className={`flex items-center justify-center w-10 h-10 -my-2 -mr-1 md:w-8 md:h-8 md:-my-1 md:-mr-0.5 rounded-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 ${
+                  isMenuActive
+                    ? 'bg-zinc-100 text-zinc-900 opacity-100'
+                    : 'text-zinc-400 active:bg-zinc-100 md:opacity-25 md:group-hover:opacity-100 md:group-focus-within:opacity-100 md:hover:bg-zinc-100 md:hover:text-zinc-800'
+                }`}
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
             </div>
           )}
         </div>
-
-        {/* Desktop hover/focus mini actions */}
-        {!isEditing && (
-          <div
-            className={`hidden md:flex items-center gap-0.5 shrink-0 h-6 transition-opacity ${
-              activePanel !== 'none'
-                ? 'opacity-100'
-                : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
-            }`}
-          >
-            {reorderEnabled && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => onMoveUp?.()}
-                  disabled={!canMoveUp}
-                  title="위로 이동 (Alt+↑)"
-                  aria-label="위로 이동"
-                  className="flex items-center justify-center w-7 h-8 rounded-md text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-zinc-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900"
-                >
-                  <ChevronUp className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onMoveDown?.()}
-                  disabled={!canMoveDown}
-                  title="아래로 이동 (Alt+↓)"
-                  aria-label="아래로 이동"
-                  className="flex items-center justify-center w-7 h-8 rounded-md text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-zinc-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900"
-                >
-                  <ChevronDown className="w-3.5 h-3.5" />
-                </button>
-              </>
-            )}
-            <button
-              type="button"
-              onClick={() => void onTogglePriority(entry)}
-              title={entry.priority ? '중요 표시 해제 (*)' : '중요 표시 (*)'}
-              aria-label={entry.priority ? '중요 표시 해제' : '중요 표시'}
-              aria-pressed={Boolean(entry.priority)}
-              className={`flex items-center justify-center w-8 h-8 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 ${
-                entry.priority
-                  ? 'text-amber-500 hover:bg-amber-50'
-                  : 'text-zinc-400 hover:text-amber-600 hover:bg-zinc-100'
-              }`}
-            >
-              <Star
-                className={`w-3.5 h-3.5 ${entry.priority ? 'fill-amber-400' : ''}`}
-              />
-            </button>
-            {canMigrateOrSchedule && (
-              <>
-                <button
-                  type="button"
-                  onClick={handleMigrateClick}
-                  title={
-                    entry.scope === 'future'
-                      ? '해당 월 먼슬리 로그로 옮기기 (>)'
-                      : '미루기 (>)'
-                  }
-                  aria-label="미루기"
-                  className={`flex items-center justify-center w-8 h-8 rounded-md font-mono text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 ${
-                    activePanel === 'migrate'
-                      ? 'bg-zinc-900 text-white'
-                      : 'text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100'
-                  }`}
-                >
-                  &gt;
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleScheduleClick}
-                  title="퓨처 로그로 스케줄 (<)"
-                  aria-label="퓨처 로그로 스케줄"
-                  className={`flex items-center justify-center w-8 h-8 rounded-md font-mono text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 ${
-                    activePanel === 'schedule'
-                      ? 'bg-zinc-900 text-white'
-                      : 'text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100'
-                  }`}
-                >
-                  &lt;
-                </button>
-              </>
-            )}
-
-            <button
-              type="button"
-              onClick={startEdit}
-              title="수정"
-              aria-label="항목 수정"
-              className="flex items-center justify-center w-8 h-8 rounded-md text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => void onDelete(entry)}
-              title="삭제"
-              aria-label="항목 삭제"
-              className="flex items-center justify-center w-8 h-8 rounded-md text-zinc-400 hover:text-red-600 hover:bg-red-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
-
-        {/* Mobile touch-friendly action toggle (40x40px hitbox) */}
-        {!isEditing && (
-          <div className="flex md:hidden items-center h-6 shrink-0">
-            <button
-              type="button"
-              onClick={() => {
-                setActivePanel('none');
-                setMobileMenuOpen((prev) => !prev);
-              }}
-              aria-label="항목 작업 열기"
-              aria-expanded={mobileMenuOpen}
-              className={`flex items-center justify-center w-10 h-10 -my-2 -mr-1 rounded-md transition-colors ${
-                mobileMenuOpen
-                  ? 'bg-zinc-100 text-zinc-900'
-                  : 'text-zinc-400 active:bg-zinc-100'
-              }`}
-            >
-              <MoreHorizontal className="w-4 h-4" />
-            </button>
-          </div>
-        )}
       </div>
 
-      {/* Mobile expanded action bar (all >= 40x40px touch targets) */}
-      {mobileMenuOpen && !isEditing && (
-        <div className="md:hidden px-2 pb-2 pt-0.5 space-y-1">
-          <div
-            className={`grid gap-1 ${
-              canMigrateOrSchedule ? 'grid-cols-5' : 'grid-cols-3'
-            }`}
-          >
+      {/* Unified Minimal Expandable Action Tray */}
+      {trayOpen && !isEditing && (
+        <div
+          role="toolbar"
+          aria-label="항목 작업"
+          className="mx-1.5 mb-2 mt-0.5 rounded-lg border border-zinc-200/80 bg-zinc-50/90 p-1.5"
+        >
+          <div className="flex flex-wrap items-center gap-1">
             <button
               type="button"
               onClick={() => {
-                setMobileMenuOpen(false);
+                setTrayOpen(false);
                 void onTogglePriority(entry);
               }}
               aria-pressed={Boolean(entry.priority)}
-              className={`flex items-center justify-center gap-1 min-h-[40px] rounded-md border text-[11px] font-medium whitespace-nowrap ${
+              className={`inline-flex items-center gap-1 min-h-[36px] md:min-h-[30px] px-2.5 py-1 rounded-md border text-xs font-medium transition-colors whitespace-nowrap ${
                 entry.priority
-                  ? 'border-amber-200 bg-amber-50 text-amber-700 active:bg-amber-100'
-                  : 'border-zinc-200 bg-white text-zinc-700 active:bg-zinc-100'
+                  ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100/70'
+                  : 'border-zinc-200/90 bg-white text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900'
               }`}
             >
               <Star
@@ -490,77 +445,139 @@ export function EntryRow({
               />
               <span>중요</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setTrayOpen(false);
+                void onSetIndent(entry, isIndented ? 0 : 1);
+              }}
+              aria-pressed={isIndented}
+              title="들여쓰기 토글 (Tab / Shift+Tab)"
+              className={`inline-flex items-center gap-1 min-h-[36px] md:min-h-[30px] px-2.5 py-1 rounded-md border text-xs font-medium transition-colors whitespace-nowrap ${
+                isIndented
+                  ? 'border-zinc-300 bg-zinc-200/70 text-zinc-900 hover:bg-zinc-200'
+                  : 'border-zinc-200/90 bg-white text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900'
+              }`}
+            >
+              {isIndented ? (
+                <>
+                  <IndentDecrease className="w-3.5 h-3.5 shrink-0" />
+                  <span>내어쓰기</span>
+                </>
+              ) : (
+                <>
+                  <IndentIncrease className="w-3.5 h-3.5 shrink-0" />
+                  <span>들여쓰기</span>
+                </>
+              )}
+            </button>
+
+            {reorderEnabled && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTrayOpen(false);
+                    onMoveUp?.();
+                  }}
+                  disabled={!canMoveUp}
+                  title="위로 이동 (Alt+↑)"
+                  className="inline-flex items-center gap-1 min-h-[36px] md:min-h-[30px] px-2.5 py-1 rounded-md border border-zinc-200/90 bg-white text-xs font-medium text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors whitespace-nowrap"
+                >
+                  <ChevronUp className="w-3.5 h-3.5 shrink-0" />
+                  <span>위로</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTrayOpen(false);
+                    onMoveDown?.();
+                  }}
+                  disabled={!canMoveDown}
+                  title="아래로 이동 (Alt+↓)"
+                  className="inline-flex items-center gap-1 min-h-[36px] md:min-h-[30px] px-2.5 py-1 rounded-md border border-zinc-200/90 bg-white text-xs font-medium text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors whitespace-nowrap"
+                >
+                  <ChevronDown className="w-3.5 h-3.5 shrink-0" />
+                  <span>아래로</span>
+                </button>
+              </>
+            )}
+
             {canMigrateOrSchedule && (
               <>
                 <button
                   type="button"
                   onClick={handleMigrateClick}
-                  className="flex items-center justify-center gap-1 min-h-[40px] rounded-md border border-zinc-200 bg-white text-[11px] font-medium text-zinc-700 active:bg-zinc-100 whitespace-nowrap"
+                  className="inline-flex items-center gap-1 min-h-[36px] md:min-h-[30px] px-2.5 py-1 rounded-md border border-zinc-200/90 bg-white text-xs font-medium text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 transition-colors whitespace-nowrap"
                 >
-                  <span className="font-mono">&gt;</span>
+                  <span className="font-mono text-[13px] leading-none">&gt;</span>
                   <span>{entry.scope === 'future' ? '먼슬리' : '미루기'}</span>
                 </button>
+
                 <button
                   type="button"
                   onClick={handleScheduleClick}
-                  className="flex items-center justify-center gap-1 min-h-[40px] rounded-md border border-zinc-200 bg-white text-[11px] font-medium text-zinc-700 active:bg-zinc-100 whitespace-nowrap"
+                  className="inline-flex items-center gap-1 min-h-[36px] md:min-h-[30px] px-2.5 py-1 rounded-md border border-zinc-200/90 bg-white text-xs font-medium text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 transition-colors whitespace-nowrap"
                 >
-                  <span className="font-mono">&lt;</span>
+                  <span className="font-mono text-[13px] leading-none">&lt;</span>
                   <span>스케줄</span>
                 </button>
               </>
             )}
+
+            {entry.type === 'task' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setTrayOpen(false);
+                  void onToggleCancelled(entry);
+                }}
+                aria-pressed={isCancelled}
+                title={
+                  isCancelled
+                    ? '안 함(취소선) 해제하고 미완료로 되돌리기'
+                    : '안 하기로 결정함 (취소선)'
+                }
+                className={`inline-flex items-center gap-1 min-h-[36px] md:min-h-[30px] px-2.5 py-1 rounded-md border text-xs font-medium transition-colors whitespace-nowrap ${
+                  isCancelled
+                    ? 'border-zinc-300 bg-zinc-200/70 text-zinc-900 hover:bg-zinc-200'
+                    : 'border-zinc-200/90 bg-white text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900'
+                }`}
+              >
+                <Strikethrough className="w-3.5 h-3.5 shrink-0" />
+                <span>{isCancelled ? '안 함 해제' : '안 함'}</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={startEdit}
-              className="flex items-center justify-center gap-1 min-h-[40px] rounded-md border border-zinc-200 bg-white text-[11px] font-medium text-zinc-700 active:bg-zinc-100 whitespace-nowrap"
+              className="inline-flex items-center gap-1 min-h-[36px] md:min-h-[30px] px-2.5 py-1 rounded-md border border-zinc-200/90 bg-white text-xs font-medium text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 transition-colors whitespace-nowrap"
             >
               <Pencil className="w-3.5 h-3.5 shrink-0" />
               <span>수정</span>
             </button>
+
             <button
               type="button"
               onClick={() => {
-                setMobileMenuOpen(false);
+                setTrayOpen(false);
                 void onDelete(entry);
               }}
-              className="flex items-center justify-center gap-1 min-h-[40px] rounded-md border border-zinc-200 bg-white text-[11px] font-medium text-red-600 active:bg-red-50 whitespace-nowrap"
+              className="inline-flex items-center gap-1 min-h-[36px] md:min-h-[30px] px-2.5 py-1 rounded-md border border-zinc-200/90 bg-white text-xs font-medium text-red-600 hover:bg-red-50 hover:border-red-200 transition-colors whitespace-nowrap"
             >
               <Trash2 className="w-3.5 h-3.5 shrink-0" />
               <span>삭제</span>
             </button>
           </div>
-
-          {reorderEnabled && (
-            <div className="grid grid-cols-2 gap-1">
-              <button
-                type="button"
-                onClick={() => onMoveUp?.()}
-                disabled={!canMoveUp}
-                aria-label="위로 이동"
-                className="flex items-center justify-center gap-1 min-h-[40px] rounded-md border border-zinc-200 bg-white text-[11px] font-medium text-zinc-700 active:bg-zinc-100 disabled:opacity-35 disabled:active:bg-white whitespace-nowrap"
-              >
-                <ChevronUp className="w-3.5 h-3.5 shrink-0" />
-                <span>위로</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => onMoveDown?.()}
-                disabled={!canMoveDown}
-                aria-label="아래로 이동"
-                className="flex items-center justify-center gap-1 min-h-[40px] rounded-md border border-zinc-200 bg-white text-[11px] font-medium text-zinc-700 active:bg-zinc-100 disabled:opacity-35 disabled:active:bg-white whitespace-nowrap"
-              >
-                <ChevronDown className="w-3.5 h-3.5 shrink-0" />
-                <span>아래로</span>
-              </button>
-            </div>
-          )}
         </div>
       )}
 
       {/* Migrate (>) destination panel */}
       {activePanel === 'migrate' && (
-        <div className="mx-2 mb-2 mt-1 rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
+        <div className="mx-1.5 mb-2 mt-1 rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="flex items-center gap-1.5 text-xs font-medium text-zinc-700">
               <ArrowRight className="w-3.5 h-3.5 text-zinc-400" />
@@ -623,7 +640,7 @@ export function EntryRow({
 
       {/* Schedule (<) Future Log month selector */}
       {activePanel === 'schedule' && (
-        <div className="mx-2 mb-2 mt-1 rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
+        <div className="mx-1.5 mb-2 mt-1 rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="flex items-center gap-1.5 text-xs font-medium text-zinc-700">
               <CalendarClock className="w-3.5 h-3.5 text-zinc-400" />

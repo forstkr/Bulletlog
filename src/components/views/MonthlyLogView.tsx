@@ -29,10 +29,13 @@ interface MonthlyLogViewProps {
     dateKey: string,
     type: BulletType,
     rawText: string,
-    priority?: boolean
+    priority?: boolean,
+    indent?: 0 | 1
   ) => Promise<void>;
   onToggleTask: (entry: JournalEntry) => Promise<void>;
   onTogglePriority: (entry: JournalEntry) => Promise<void>;
+  onSetIndent: (entry: JournalEntry, indent: 0 | 1) => Promise<void>;
+  onToggleCancelled: (entry: JournalEntry) => Promise<void>;
   onUpdateText: (entry: JournalEntry, rawText: string) => Promise<void>;
   onMigrate: (
     entry: JournalEntry,
@@ -55,6 +58,8 @@ export function MonthlyLogView({
   onCreateEntry,
   onToggleTask,
   onTogglePriority,
+  onSetIndent,
+  onToggleCancelled,
   onUpdateText,
   onMigrate,
   onSchedule,
@@ -349,8 +354,8 @@ export function MonthlyLogView({
             <RapidInput
               showHints
               placeholder="이번 달 할 일 또는 메모 입력..."
-              onSubmit={(type, rawText, priority) =>
-                onCreateEntry('monthly', monthKey, type, rawText, priority)
+              onSubmit={(type, rawText, priority, indent) =>
+                onCreateEntry('monthly', monthKey, type, rawText, priority, indent)
               }
             />
           </div>
@@ -374,6 +379,8 @@ export function MonthlyLogView({
                   highlighted={highlightId === entry.id}
                   onToggleTask={onToggleTask}
                   onTogglePriority={onTogglePriority}
+                  onSetIndent={onSetIndent}
+                  onToggleCancelled={onToggleCancelled}
                   onUpdateText={onUpdateText}
                   onMigrate={onMigrate}
                   onSchedule={onSchedule}

@@ -110,6 +110,7 @@ function sanitizeForFirestore(entry: JournalEntry): JournalEntry {
     status: entry.status,
     content: entry.content.slice(0, 2000),
     priority: Boolean(entry.priority),
+    indent: entry.indent === 1 ? 1 : 0,
     eventTime: entry.eventTime ?? null,
     order: entry.order,
     migratedToId: entry.migratedToId ?? null,

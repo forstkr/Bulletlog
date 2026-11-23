@@ -15,6 +15,7 @@ export interface CreateEntryParams {
   type: BulletType;
   rawText: string;
   priority?: boolean;
+  indent?: 0 | 1;
 }
 
 export interface CalendarSyncResult {
@@ -118,6 +119,7 @@ export function useJournal(enabled = true) {
       type,
       rawText,
       priority = false,
+      indent = 0,
     }: CreateEntryParams): Promise<JournalEntry | null> => {
       const trimmed = rawText.trim();
       if (!trimmed) return null;
@@ -142,6 +144,7 @@ export function useJournal(enabled = true) {
         status: 'open',
         content,
         priority: Boolean(priority),
+        indent: indent === 1 ? 1 : 0,
         eventTime,
         order: getNextOrder(scope, dateKey),
         migratedToId: null,
@@ -190,6 +193,40 @@ export function useJournal(enabled = true) {
       });
     } catch {
       setSyncError('중요 표시 변경에 실패했습니다.');
+    }
+  }, []);
+
+  const setEntryIndent = useCallback(
+    async (entry: JournalEntry, indent: 0 | 1): Promise<void> => {
+      const currentIndent: 0 | 1 = entry.indent === 1 ? 1 : 0;
+      if (currentIndent === indent) return;
+
+      // Optimistic local state update for responsive Tab/Shift+Tab toggling
+      setEntries((prev) =>
+        prev.map((item) =>
+          item.id === entry.id ? { ...item, indent } : item
+        )
+      );
+
+      try {
+        await journalRepository.updateEntry(entry.id, { indent });
+      } catch {
+        setSyncError('들여쓰기 변경에 실패했습니다.');
+      }
+    },
+    []
+  );
+
+  const toggleCancelled = useCallback(async (entry: JournalEntry): Promise<void> => {
+    if (entry.type !== 'task') return;
+    const nextStatus = entry.status === 'cancelled' ? 'open' : 'cancelled';
+    try {
+      await journalRepository.updateEntry(entry.id, {
+        status: nextStatus,
+        ...(nextStatus === 'open' ? { migratedToId: null } : {}),
+      });
+    } catch {
+      setSyncError('상태 변경에 실패했습니다.');
     }
   }, []);
 
@@ -310,6 +347,7 @@ export function useJournal(enabled = true) {
         status: 'open',
         content: entry.content,
         priority: Boolean(entry.priority),
+        indent: 0,
         eventTime: entry.eventTime ?? null,
         order: getNextOrder(targetScope, targetDateKey),
         migratedToId: null,
@@ -357,6 +395,7 @@ export function useJournal(enabled = true) {
             status: 'open',
             content: entry.content,
             priority: Boolean(entry.priority),
+            indent: 0,
             eventTime: entry.eventTime ?? null,
             order: nextOrder,
             migratedToId: null,
@@ -398,6 +437,7 @@ export function useJournal(enabled = true) {
         status: 'open',
         content: entry.content,
         priority: Boolean(entry.priority),
+        indent: 0,
         eventTime: entry.eventTime ?? null,
         order: getNextOrder('future', futureMonthKey),
         migratedToId: null,
@@ -591,6 +631,8 @@ export function useJournal(enabled = true) {
     createEntry,
     toggleTaskStatus,
     togglePriority,
+    setEntryIndent,
+    toggleCancelled,
     reorderEntries,
     updateEntryContent,
     migrateEntry,

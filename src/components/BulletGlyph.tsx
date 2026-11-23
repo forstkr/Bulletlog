@@ -57,7 +57,7 @@ function renderSymbol(type: BulletType, status: TaskStatus) {
       return (
         <span
           aria-hidden="true"
-          className="w-2.5 h-[1.5px] rounded-full bg-neutral-300"
+          className="w-1.5 h-1.5 rounded-full bg-neutral-300"
         />
       );
     case 'open':

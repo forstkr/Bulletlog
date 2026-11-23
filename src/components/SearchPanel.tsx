@@ -268,11 +268,11 @@ export function SearchPanel({
           filteredResults.map((entry, idx) => {
             const isSelected = mode === 'modal' && idx === activeIndex;
             const isDone = entry.type === 'task' && entry.status === 'done';
+            const isCancelled =
+              entry.type === 'task' && entry.status === 'cancelled';
             const isFaded =
               entry.type === 'task' &&
-              (entry.status === 'migrated' ||
-                entry.status === 'scheduled' ||
-                entry.status === 'cancelled');
+              (entry.status === 'migrated' || entry.status === 'scheduled');
 
             return (
               <button
@@ -297,17 +297,25 @@ export function SearchPanel({
                     )}
                     <span
                       className={`text-[15px] leading-6 break-words ${
-                        isDone
-                          ? 'line-through text-zinc-400'
-                          : isFaded
-                            ? 'text-zinc-400'
-                            : entry.priority
-                              ? 'font-medium text-neutral-950'
-                              : 'text-zinc-900'
+                        isCancelled
+                          ? 'line-through decoration-neutral-400 text-neutral-400'
+                          : isDone
+                            ? 'line-through text-zinc-400'
+                            : isFaded
+                              ? 'text-zinc-400'
+                              : entry.priority
+                                ? 'font-medium text-neutral-950'
+                                : 'text-zinc-900'
                       }`}
                     >
                       {entry.priority && (
-                        <span className="text-amber-600 font-semibold mr-1">
+                        <span
+                          className={`font-semibold mr-1 ${
+                            isCancelled || isDone || isFaded
+                              ? 'text-neutral-400'
+                              : 'text-amber-600'
+                          }`}
+                        >
                           *
                         </span>
                       )}

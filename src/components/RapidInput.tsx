@@ -1,4 +1,4 @@
-import { CornerDownLeft } from 'lucide-react';
+import { CornerDownLeft, CornerDownRight } from 'lucide-react';
 import { type ChangeEvent, type KeyboardEvent, useRef, useState } from 'react';
 import type { BulletType } from '../types/journal';
 import {
@@ -11,7 +11,8 @@ interface RapidInputProps {
   onSubmit: (
     type: BulletType,
     rawText: string,
-    priority?: boolean
+    priority?: boolean,
+    indent?: 0 | 1
   ) => void | Promise<void>;
   defaultType?: BulletType;
   placeholder?: string;
@@ -41,6 +42,7 @@ export function RapidInput({
 }: RapidInputProps) {
   const [bulletType, setBulletType] = useState<BulletType>(defaultType);
   const [priority, setPriority] = useState(false);
+  const [indent, setIndent] = useState<0 | 1>(0);
   const [text, setText] = useState('');
   const isComposingRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -81,16 +83,33 @@ export function RapidInput({
 
     if (!effectiveText) return;
 
-    await onSubmit(effectiveType, effectiveText, effectivePriority);
+    await onSubmit(effectiveType, effectiveText, effectivePriority, indent);
     setText('');
     setPriority(false);
+    setIndent(0);
     inputRef.current?.focus();
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && text === '' && priority) {
-      setPriority(false);
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      if (e.shiftKey) {
+        setIndent(0);
+      } else {
+        setIndent((prev) => (prev === 1 ? 0 : 1));
+      }
       return;
+    }
+
+    if (e.key === 'Backspace' && text === '') {
+      if (priority) {
+        setPriority(false);
+        return;
+      }
+      if (indent === 1) {
+        setIndent(0);
+        return;
+      }
     }
 
     if (e.key === 'Enter') {
@@ -167,6 +186,22 @@ export function RapidInput({
           </div>
         )}
 
+        {indent === 1 && (
+          <button
+            type="button"
+            onClick={() => {
+              setIndent(0);
+              inputRef.current?.focus();
+            }}
+            title="하위 항목 들여쓰기 해제 (Shift+Tab)"
+            aria-label="하위 항목 들여쓰기 해제"
+            className="inline-flex items-center gap-0.5 px-1.5 h-6 rounded bg-zinc-100 border border-zinc-200 text-zinc-600 text-[11px] font-medium leading-none shrink-0 hover:bg-zinc-200/70 transition-colors"
+          >
+            <CornerDownRight className="w-3 h-3" />
+            <span>하위</span>
+          </button>
+        )}
+
         {priority && (
           <button
             type="button"
@@ -241,6 +276,12 @@ export function RapidInput({
           <span aria-hidden="true">·</span>
           <span>
             <code className="font-mono text-zinc-500">- </code>메모
+          </span>
+          <span aria-hidden="true" className="hidden md:inline">
+            ·
+          </span>
+          <span className="hidden md:inline">
+            <code className="font-mono text-zinc-500">Tab</code> 들여쓰기
           </span>
           <span aria-hidden="true" className="hidden md:inline">
             ·
