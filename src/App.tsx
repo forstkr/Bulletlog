@@ -1,6 +1,7 @@
 import { RotateCcw, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarSyncBar } from './components/CalendarSyncBar';
+import { GuideModal } from './components/GuideModal';
 import { LoginScreen } from './components/LoginScreen';
 import { MobileTabBar } from './components/MobileTabBar';
 import { OfflineIndicator } from './components/OfflineIndicator';
@@ -70,6 +71,7 @@ export default function App() {
   >(undefined);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
+  const [guideModalOpen, setGuideModalOpen] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
 
   const toastTimerRef = useRef<number | null>(null);
@@ -300,6 +302,7 @@ export default function App() {
           setActiveView(view);
         }}
         onOpenSearch={() => setSearchModalOpen(true)}
+        onOpenGuide={() => setGuideModalOpen(true)}
         openTaskCount={openTaskCount}
         userEmail={user?.email}
         onSignOut={signOutUser}
@@ -315,6 +318,7 @@ export default function App() {
           lastSyncedTime={lastCalendarSyncedTime}
           onSync={handleManualCalendarSync}
           onReconnect={handleReconnectCalendar}
+          onOpenGuide={() => setGuideModalOpen(true)}
         />
 
         {syncError && (
@@ -436,6 +440,12 @@ export default function App() {
           onClose={() => setSearchModalOpen(false)}
         />
       )}
+
+      {/* Original Bullet Journal Guide Modal */}
+      <GuideModal
+        isOpen={guideModalOpen}
+        onClose={() => setGuideModalOpen(false)}
+      />
 
       {/* Subtle Action / Undo Toast */}
       {toast && (

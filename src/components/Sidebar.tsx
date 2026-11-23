@@ -3,6 +3,7 @@ import {
   Calendar,
   CalendarRange,
   FileText,
+  HelpCircle,
   LogOut,
   Search,
 } from 'lucide-react';
@@ -14,6 +15,7 @@ interface SidebarProps {
   activeView: ActiveView;
   onSelectView: (view: Exclude<ActiveView, 'search'>) => void;
   onOpenSearch: () => void;
+  onOpenGuide: () => void;
   openTaskCount: number;
   userEmail?: string | null;
   onSignOut: () => Promise<void>;
@@ -34,6 +36,7 @@ export function Sidebar({
   activeView,
   onSelectView,
   onOpenSearch,
+  onOpenGuide,
   openTaskCount,
   userEmail,
   onSignOut,
@@ -108,6 +111,15 @@ export function Sidebar({
       </nav>
 
       <div className="px-4 py-4 border-t border-zinc-200/70 space-y-3">
+        <button
+          type="button"
+          onClick={onOpenGuide}
+          className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-medium text-zinc-600 hover:bg-zinc-200/60 hover:text-zinc-900 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900"
+        >
+          <HelpCircle className="w-4 h-4 text-zinc-400 shrink-0" />
+          <span>사용법</span>
+        </button>
+
         <PWAInstallButton />
 
         <div className="px-1 text-xs text-zinc-400">

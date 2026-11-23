@@ -1,4 +1,4 @@
-import { CalendarCheck2, CalendarSync, RefreshCw } from 'lucide-react';
+import { CalendarCheck2, CalendarSync, HelpCircle, RefreshCw } from 'lucide-react';
 import type { CalendarConnectionStatus } from '../services/googleCalendar';
 
 interface CalendarSyncBarProps {
@@ -8,6 +8,7 @@ interface CalendarSyncBarProps {
   lastSyncedTime: string | null;
   onSync: () => Promise<void>;
   onReconnect: () => Promise<void>;
+  onOpenGuide: () => void;
 }
 
 export function CalendarSyncBar({
@@ -17,6 +18,7 @@ export function CalendarSyncBar({
   lastSyncedTime,
   onSync,
   onReconnect,
+  onOpenGuide,
 }: CalendarSyncBarProps) {
   return (
     <div className="max-w-6xl mx-auto px-5 pt-4 md:px-10 md:pt-5 flex items-center justify-end gap-2">
@@ -33,7 +35,7 @@ export function CalendarSyncBar({
             onClick={() => void onSync()}
             disabled={isSyncing}
             aria-label="구글 캘린더 동기화"
-            className="inline-flex items-center gap-1.5 min-h-[36px] md:min-h-[32px] px-3 py-1 rounded-lg border border-zinc-200 bg-white text-xs font-medium text-zinc-600 hover:text-zinc-900 hover:border-zinc-300 hover:bg-zinc-50 active:bg-zinc-100 disabled:opacity-60 transition-colors whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-1.5 min-h-[40px] md:min-h-[32px] px-3 py-1 rounded-lg border border-zinc-200 bg-white text-xs font-medium text-zinc-600 hover:text-zinc-900 hover:border-zinc-300 hover:bg-zinc-50 active:bg-zinc-100 disabled:opacity-60 transition-colors whitespace-nowrap shrink-0"
           >
             <RefreshCw
               className={`w-3.5 h-3.5 shrink-0 ${isSyncing ? 'animate-spin' : ''}`}
@@ -46,7 +48,7 @@ export function CalendarSyncBar({
           type="button"
           onClick={() => void onReconnect()}
           disabled={isReconnecting}
-          className={`inline-flex items-center gap-1.5 min-h-[36px] md:min-h-[32px] px-3 py-1 rounded-lg border text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+          className={`inline-flex items-center gap-1.5 min-h-[40px] md:min-h-[32px] px-3 py-1 rounded-lg border text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
             calendarStatus === 'expired'
               ? 'border-amber-300 bg-amber-50/70 text-amber-800 hover:bg-amber-100/70'
               : 'border-zinc-200 bg-white text-zinc-600 hover:text-zinc-900 hover:border-zinc-300 hover:bg-zinc-50'
@@ -62,6 +64,17 @@ export function CalendarSyncBar({
           </span>
         </button>
       )}
+
+      {/* Mobile-only usage guide button (>=40x40px touch target) */}
+      <button
+        type="button"
+        onClick={onOpenGuide}
+        aria-label="불렛저널 사용법 가이드"
+        title="사용법"
+        className="md:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg border border-zinc-200 bg-white text-zinc-600 active:bg-zinc-100 transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900"
+      >
+        <HelpCircle className="w-4 h-4" />
+      </button>
     </div>
   );
 }
