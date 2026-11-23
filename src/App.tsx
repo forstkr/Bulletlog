@@ -1,5 +1,6 @@
 import { RotateCcw, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CalendarSyncBar } from './components/CalendarSyncBar';
 import { LoginScreen } from './components/LoginScreen';
 import { MobileTabBar } from './components/MobileTabBar';
 import { OfflineIndicator } from './components/OfflineIndicator';
@@ -31,7 +32,10 @@ export default function App() {
     user,
     error: authError,
     isSigningIn,
+    calendarStatus,
+    isReconnectingCalendar,
     signInWithGoogle,
+    reconnectCalendar,
     signOutUser,
   } = useAuth();
 
@@ -41,6 +45,8 @@ export default function App() {
     entries,
     isLoading: isEntriesLoading,
     syncError,
+    isCalendarSyncing,
+    lastCalendarSyncedTime,
     clearSyncError,
     createEntry,
     toggleTaskStatus,
@@ -49,6 +55,7 @@ export default function App() {
     scheduleEntry,
     deleteEntry,
     restoreEntry,
+    syncFromGoogleCalendar,
   } = useJournal(isAuthenticated);
 
   const [activeView, setActiveView] = useState<ActiveView>('daily');
@@ -67,6 +74,7 @@ export default function App() {
 
   const toastTimerRef = useRef<number | null>(null);
   const highlightTimerRef = useRef<number | null>(null);
+  const hasAutoSyncedRef = useRef(false);
 
   const showToast = useCallback((next: ToastState) => {
     if (toastTimerRef.current) {
@@ -87,6 +95,24 @@ export default function App() {
     };
   }, []);
 
+  // Auto-run inbound Google Calendar sync once Firestore entries finish loading and token is ready
+  useEffect(() => {
+    if (!isAuthenticated || calendarStatus !== 'connected') {
+      hasAutoSyncedRef.current = false;
+      return;
+    }
+    if (isEntriesLoading || hasAutoSyncedRef.current) {
+      return;
+    }
+    hasAutoSyncedRef.current = true;
+    void syncFromGoogleCalendar();
+  }, [
+    isAuthenticated,
+    isEntriesLoading,
+    calendarStatus,
+    syncFromGoogleCalendar,
+  ]);
+
   // Global Ctrl+K / Cmd+K shortcut for search (active only when authenticated)
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -103,6 +129,43 @@ export default function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isAuthenticated]);
+
+  const handleManualCalendarSync = useCallback(async () => {
+    const result = await syncFromGoogleCalendar();
+    if (result.status === 'auth_required') {
+      showToast({
+        message: '캘린더 인증이 필요합니다. 상단의 [캘린더 재연결]을 눌러 주세요.',
+      });
+      return;
+    }
+    if (result.status === 'ok') {
+      const changes: string[] = [];
+      if (result.createdCount > 0) changes.push(`새 일정 ${result.createdCount}건`);
+      if (result.updatedCount > 0) changes.push(`업데이트 ${result.updatedCount}건`);
+      showToast({
+        message:
+          changes.length > 0
+            ? `캘린더 동기화 완료 (${changes.join(', ')})`
+            : '구글 캘린더와 최신 상태입니다.',
+      });
+    }
+  }, [syncFromGoogleCalendar, showToast]);
+
+  const handleReconnectCalendar = useCallback(async () => {
+    const connected = await reconnectCalendar();
+    if (!connected) return;
+    hasAutoSyncedRef.current = true;
+    const result = await syncFromGoogleCalendar();
+    if (result.status === 'ok') {
+      const total = result.createdCount + result.updatedCount;
+      showToast({
+        message:
+          total > 0
+            ? `캘린더 연결 및 동기화 완료 (${total}건 반영)`
+            : '구글 캘린더가 연결되었습니다.',
+      });
+    }
+  }, [reconnectCalendar, syncFromGoogleCalendar, showToast]);
 
   const handleNavigate = useCallback((target: NavigationTarget) => {
     setActiveView(target.view);
@@ -244,6 +307,16 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 min-w-0 pb-24 md:pb-12">
+        {/* Compact Calendar Sync / Reconnect Header Bar */}
+        <CalendarSyncBar
+          calendarStatus={calendarStatus}
+          isSyncing={isCalendarSyncing}
+          isReconnecting={isReconnectingCalendar}
+          lastSyncedTime={lastCalendarSyncedTime}
+          onSync={handleManualCalendarSync}
+          onReconnect={handleReconnectCalendar}
+        />
+
         {syncError && (
           <div
             role="alert"

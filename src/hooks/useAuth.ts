@@ -1,7 +1,9 @@
 import {
+  GoogleAuthProvider,
   type User,
   browserLocalPersistence,
   onAuthStateChanged,
+  reauthenticateWithPopup,
   setPersistence,
   signInWithPopup,
   signOut,
@@ -14,6 +16,10 @@ import {
   isFirebaseConfigured,
   testFirestoreConnection,
 } from '../config/firebase';
+import {
+  type CalendarConnectionStatus,
+  googleCalendarService,
+} from '../services/googleCalendar';
 
 export type AuthStatus =
   | 'loading'
@@ -29,6 +35,15 @@ export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSigningIn, setIsSigningIn] = useState(false);
+  const [isReconnectingCalendar, setIsReconnectingCalendar] = useState(false);
+  const [calendarStatus, setCalendarStatus] =
+    useState<CalendarConnectionStatus>(() => googleCalendarService.getStatus());
+
+  useEffect(() => {
+    return googleCalendarService.subscribeStatus((next) => {
+      setCalendarStatus(next);
+    });
+  }, []);
 
   useEffect(() => {
     if (!isFirebaseConfigured || !auth) {
@@ -39,13 +54,19 @@ export function useAuth() {
     const firebaseAuth = auth;
     const unsubscribe = onAuthStateChanged(firebaseAuth, async (firebaseUser) => {
       if (!firebaseUser) {
+        googleCalendarService.clearAccessToken();
         setUser(null);
-        setStatus((prev) => (prev === 'unauthorized' ? 'unauthorized' : 'unauthenticated'));
+        setStatus((prev) =>
+          prev === 'unauthorized' ? 'unauthorized' : 'unauthenticated'
+        );
         return;
       }
 
       if (!isEmailAllowed(firebaseUser.email)) {
-        setError('허용되지 않은 Google 계정입니다. 등록된 개인 계정으로 로그인해 주세요.');
+        googleCalendarService.clearAccessToken();
+        setError(
+          '허용되지 않은 Google 계정입니다. 등록된 개인 계정으로 로그인해 주세요.'
+        );
         setUser(null);
         setStatus('unauthorized');
         try {
@@ -79,12 +100,18 @@ export function useAuth() {
       const result = await signInWithPopup(auth, googleProvider);
 
       if (!isEmailAllowed(result.user.email)) {
+        googleCalendarService.clearAccessToken();
         await signOut(auth);
         setUser(null);
         setStatus('unauthorized');
-        setError('허용되지 않은 Google 계정입니다. 등록된 개인 계정으로 로그인해 주세요.');
+        setError(
+          '허용되지 않은 Google 계정입니다. 등록된 개인 계정으로 로그인해 주세요.'
+        );
         return;
       }
+
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      googleCalendarService.setAccessToken(credential?.accessToken ?? null);
 
       setUser(result.user);
       setStatus('authenticated');
@@ -94,10 +121,15 @@ export function useAuth() {
           ? String((err as { code?: unknown }).code)
           : '';
 
-      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+      if (
+        code === 'auth/popup-closed-by-user' ||
+        code === 'auth/cancelled-popup-request'
+      ) {
         setError(null);
       } else if (code === 'auth/popup-blocked') {
-        setError('브라우저에서 팝업이 차단되었습니다. 팝업 허용 후 다시 시도해 주세요.');
+        setError(
+          '브라우저에서 팝업이 차단되었습니다. 팝업 허용 후 다시 시도해 주세요.'
+        );
       } else if (code === 'auth/unauthorized-domain') {
         setError('Firebase 콘솔의 승인된 도메인에 현재 주소를 추가해 주세요.');
       } else {
@@ -108,9 +140,66 @@ export function useAuth() {
     }
   }, []);
 
+  /**
+   * Re-issues an in-memory Google Calendar OAuth access token in 1 click
+   * via reauthenticateWithPopup (or signInWithPopup fallback).
+   */
+  const reconnectCalendar = useCallback(async (): Promise<boolean> => {
+    if (!isFirebaseConfigured || !auth) return false;
+
+    setIsReconnectingCalendar(true);
+    try {
+      const currentUser = auth.currentUser;
+      const result = currentUser
+        ? await reauthenticateWithPopup(currentUser, googleProvider)
+        : await signInWithPopup(auth, googleProvider);
+
+      if (!isEmailAllowed(result.user.email)) {
+        googleCalendarService.clearAccessToken();
+        await signOut(auth);
+        setUser(null);
+        setStatus('unauthorized');
+        return false;
+      }
+
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      const token = credential?.accessToken ?? null;
+      googleCalendarService.setAccessToken(token);
+      return Boolean(token);
+    } catch (err: unknown) {
+      const code =
+        typeof err === 'object' && err !== null && 'code' in err
+          ? String((err as { code?: unknown }).code)
+          : '';
+
+      // If reauth failed because account context shifted, fall back once to signInWithPopup
+      if (code === 'auth/user-mismatch' || code === 'auth/requires-recent-login') {
+        try {
+          const fallback = await signInWithPopup(auth, googleProvider);
+          if (!isEmailAllowed(fallback.user.email)) {
+            googleCalendarService.clearAccessToken();
+            await signOut(auth);
+            return false;
+          }
+          const cred = GoogleAuthProvider.credentialFromResult(fallback);
+          const token = cred?.accessToken ?? null;
+          googleCalendarService.setAccessToken(token);
+          return Boolean(token);
+        } catch {
+          return false;
+        }
+      }
+
+      return false;
+    } finally {
+      setIsReconnectingCalendar(false);
+    }
+  }, []);
+
   const signOutUser = useCallback(async () => {
     if (!auth) return;
     setError(null);
+    googleCalendarService.clearAccessToken();
     try {
       await signOut(auth);
       setUser(null);
@@ -125,7 +214,10 @@ export function useAuth() {
     user,
     error,
     isSigningIn,
+    calendarStatus,
+    isReconnectingCalendar,
     signInWithGoogle,
+    reconnectCalendar,
     signOutUser,
   };
 }

@@ -43,7 +43,10 @@ let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let db: Firestore | null = null;
 
+export const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.addScope(CALENDAR_SCOPE);
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 if (isFirebaseConfigured) {
