@@ -301,9 +301,16 @@ export function SearchPanel({
                           ? 'line-through text-zinc-400'
                           : isFaded
                             ? 'text-zinc-400'
-                            : 'text-zinc-900'
+                            : entry.priority
+                              ? 'font-medium text-neutral-950'
+                              : 'text-zinc-900'
                       }`}
                     >
+                      {entry.priority && (
+                        <span className="text-amber-600 font-semibold mr-1">
+                          *
+                        </span>
+                      )}
                       {renderHighlightedText(entry.content, query)}
                     </span>
                   </div>

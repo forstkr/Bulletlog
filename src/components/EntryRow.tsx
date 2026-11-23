@@ -4,6 +4,7 @@ import {
   Check,
   MoreHorizontal,
   Pencil,
+  Star,
   Trash2,
   X,
 } from 'lucide-react';
@@ -25,6 +26,7 @@ interface EntryRowProps {
   allEntries: JournalEntry[];
   highlighted?: boolean;
   onToggleTask: (entry: JournalEntry) => void | Promise<void>;
+  onTogglePriority: (entry: JournalEntry) => void | Promise<void>;
   onUpdateText: (entry: JournalEntry, rawText: string) => void | Promise<void>;
   onMigrate: (
     entry: JournalEntry,
@@ -44,6 +46,7 @@ export function EntryRow({
   allEntries,
   highlighted = false,
   onToggleTask,
+  onTogglePriority,
   onUpdateText,
   onMigrate,
   onSchedule,
@@ -215,11 +218,16 @@ export function EntryRow({
                     ? 'line-through text-zinc-400'
                     : isFaded
                       ? 'text-zinc-400'
-                      : entry.type === 'note'
-                        ? 'text-zinc-600'
-                        : 'text-zinc-900'
+                      : entry.priority
+                        ? 'font-medium text-neutral-950'
+                        : entry.type === 'note'
+                          ? 'text-zinc-600'
+                          : 'text-zinc-900'
                 }`}
               >
+                {entry.priority && (
+                  <span className="text-amber-600 font-semibold mr-1">*</span>
+                )}
                 {entry.content}
               </span>
               {migratedTarget && migratedTargetLabel && onNavigate && (
@@ -251,6 +259,22 @@ export function EntryRow({
                 : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
             }`}
           >
+            <button
+              type="button"
+              onClick={() => void onTogglePriority(entry)}
+              title={entry.priority ? '중요 표시 해제 (*)' : '중요 표시 (*)'}
+              aria-label={entry.priority ? '중요 표시 해제' : '중요 표시'}
+              aria-pressed={Boolean(entry.priority)}
+              className={`flex items-center justify-center w-8 h-8 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 ${
+                entry.priority
+                  ? 'text-amber-500 hover:bg-amber-50'
+                  : 'text-zinc-400 hover:text-amber-600 hover:bg-zinc-100'
+              }`}
+            >
+              <Star
+                className={`w-3.5 h-3.5 ${entry.priority ? 'fill-amber-400' : ''}`}
+              />
+            </button>
             {canMigrateOrSchedule && (
               <>
                 <button
@@ -336,15 +360,35 @@ export function EntryRow({
       {mobileMenuOpen && !isEditing && (
         <div
           className={`md:hidden grid gap-1 px-2 pb-2 pt-0.5 ${
-            canMigrateOrSchedule ? 'grid-cols-4' : 'grid-cols-2'
+            canMigrateOrSchedule ? 'grid-cols-5' : 'grid-cols-3'
           }`}
         >
+          <button
+            type="button"
+            onClick={() => {
+              setMobileMenuOpen(false);
+              void onTogglePriority(entry);
+            }}
+            aria-pressed={Boolean(entry.priority)}
+            className={`flex items-center justify-center gap-1 min-h-[40px] rounded-md border text-[11px] font-medium whitespace-nowrap ${
+              entry.priority
+                ? 'border-amber-200 bg-amber-50 text-amber-700 active:bg-amber-100'
+                : 'border-zinc-200 bg-white text-zinc-700 active:bg-zinc-100'
+            }`}
+          >
+            <Star
+              className={`w-3.5 h-3.5 shrink-0 ${
+                entry.priority ? 'fill-amber-400 text-amber-500' : ''
+              }`}
+            />
+            <span>중요</span>
+          </button>
           {canMigrateOrSchedule && (
             <>
               <button
                 type="button"
                 onClick={handleMigrateClick}
-                className="flex items-center justify-center gap-1 min-h-[40px] rounded-md border border-zinc-200 bg-white text-xs font-medium text-zinc-700 active:bg-zinc-100 whitespace-nowrap"
+                className="flex items-center justify-center gap-1 min-h-[40px] rounded-md border border-zinc-200 bg-white text-[11px] font-medium text-zinc-700 active:bg-zinc-100 whitespace-nowrap"
               >
                 <span className="font-mono">&gt;</span>
                 <span>{entry.scope === 'future' ? '먼슬리' : '미루기'}</span>
@@ -352,7 +396,7 @@ export function EntryRow({
               <button
                 type="button"
                 onClick={handleScheduleClick}
-                className="flex items-center justify-center gap-1 min-h-[40px] rounded-md border border-zinc-200 bg-white text-xs font-medium text-zinc-700 active:bg-zinc-100 whitespace-nowrap"
+                className="flex items-center justify-center gap-1 min-h-[40px] rounded-md border border-zinc-200 bg-white text-[11px] font-medium text-zinc-700 active:bg-zinc-100 whitespace-nowrap"
               >
                 <span className="font-mono">&lt;</span>
                 <span>스케줄</span>
@@ -362,9 +406,9 @@ export function EntryRow({
           <button
             type="button"
             onClick={startEdit}
-            className="flex items-center justify-center gap-1 min-h-[40px] rounded-md border border-zinc-200 bg-white text-xs font-medium text-zinc-700 active:bg-zinc-100 whitespace-nowrap"
+            className="flex items-center justify-center gap-1 min-h-[40px] rounded-md border border-zinc-200 bg-white text-[11px] font-medium text-zinc-700 active:bg-zinc-100 whitespace-nowrap"
           >
-            <Pencil className="w-3.5 h-3.5" />
+            <Pencil className="w-3.5 h-3.5 shrink-0" />
             <span>수정</span>
           </button>
           <button
@@ -373,9 +417,9 @@ export function EntryRow({
               setMobileMenuOpen(false);
               void onDelete(entry);
             }}
-            className="flex items-center justify-center gap-1 min-h-[40px] rounded-md border border-zinc-200 bg-white text-xs font-medium text-red-600 active:bg-red-50 whitespace-nowrap"
+            className="flex items-center justify-center gap-1 min-h-[40px] rounded-md border border-zinc-200 bg-white text-[11px] font-medium text-red-600 active:bg-red-50 whitespace-nowrap"
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <Trash2 className="w-3.5 h-3.5 shrink-0" />
             <span>삭제</span>
           </button>
         </div>

@@ -130,6 +130,19 @@ export function formatMonthShort(monthKey: string): string {
   return format(parseDateKey(monthKey), 'M월', { locale: ko });
 }
 
+export function getPastDayKeys(baseDateKey: string, count: number): string[] {
+  const base = parseDateKey(baseDateKey);
+  const keys: string[] = [];
+  for (let i = 1; i <= count; i += 1) {
+    keys.push(format(subDays(base, i), 'yyyy-MM-dd'));
+  }
+  return keys;
+}
+
+export function formatMonthDay(dateKey: string): string {
+  return format(parseDateKey(dateKey), 'M월 d일', { locale: ko });
+}
+
 export function isTodayKey(dateKey: string): boolean {
   return dateKey === getTodayKey();
 }

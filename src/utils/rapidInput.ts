@@ -2,26 +2,54 @@ import type { BulletType, TaskStatus } from '../types/journal';
 
 export interface PrefixDetectionResult {
   detectedType: BulletType | null;
+  detectedPriority: boolean;
   remainingText: string;
 }
 
 /**
  * Detects rapid-logging prefix triggers at the start of input:
+ * - "* . " / "* " -> priority task (• + *)
  * - ". " -> task (•)
  * - "o " / "O " / "0 " -> event (○)
  * - "- " -> note (-)
  */
 export function detectRapidPrefix(raw: string): PrefixDetectionResult {
+  if (raw.startsWith('* . ')) {
+    return {
+      detectedType: 'task',
+      detectedPriority: true,
+      remainingText: raw.slice(4),
+    };
+  }
+  if (raw.startsWith('* ')) {
+    return {
+      detectedType: 'task',
+      detectedPriority: true,
+      remainingText: raw.slice(2),
+    };
+  }
   if (raw.startsWith('. ')) {
-    return { detectedType: 'task', remainingText: raw.slice(2) };
+    return {
+      detectedType: 'task',
+      detectedPriority: false,
+      remainingText: raw.slice(2),
+    };
   }
   if (raw.startsWith('o ') || raw.startsWith('O ') || raw.startsWith('0 ')) {
-    return { detectedType: 'event', remainingText: raw.slice(2) };
+    return {
+      detectedType: 'event',
+      detectedPriority: false,
+      remainingText: raw.slice(2),
+    };
   }
   if (raw.startsWith('- ')) {
-    return { detectedType: 'note', remainingText: raw.slice(2) };
+    return {
+      detectedType: 'note',
+      detectedPriority: false,
+      remainingText: raw.slice(2),
+    };
   }
-  return { detectedType: null, remainingText: raw };
+  return { detectedType: null, detectedPriority: false, remainingText: raw };
 }
 
 export interface ParsedEventText {

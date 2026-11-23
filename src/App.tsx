@@ -51,8 +51,10 @@ export default function App() {
     clearSyncError,
     createEntry,
     toggleTaskStatus,
+    togglePriority,
     updateEntryContent,
     migrateEntry,
+    migrateMultipleEntries,
     scheduleEntry,
     deleteEntry,
     restoreEntry,
@@ -201,9 +203,10 @@ export default function App() {
       scope: LogScope,
       dateKey: string,
       type: BulletType,
-      rawText: string
+      rawText: string,
+      priority?: boolean
     ) => {
-      await createEntry({ scope, dateKey, type, rawText });
+      await createEntry({ scope, dateKey, type, rawText, priority });
     },
     [createEntry]
   );
@@ -223,6 +226,22 @@ export default function App() {
       showToast({ message: label });
     },
     [migrateEntry, showToast]
+  );
+
+  const handleMigrateMultiple = useCallback(
+    async (
+      items: JournalEntry[],
+      targetScope: LogScope,
+      targetDateKey: string
+    ) => {
+      const count = await migrateMultipleEntries(items, targetScope, targetDateKey);
+      if (count > 0) {
+        showToast({
+          message: `미완료 할 일 ${count}개를 오늘로 가져왔습니다.`,
+        });
+      }
+    },
+    [migrateMultipleEntries, showToast]
   );
 
   const handleSchedule = useCallback(
@@ -368,6 +387,7 @@ export default function App() {
                 highlightId={highlightId}
                 onCreateEntry={handleCreateEntry}
                 onToggleTask={toggleTaskStatus}
+                onTogglePriority={togglePriority}
                 onUpdateText={updateEntryContent}
                 onMigrate={handleMigrate}
                 onSchedule={handleSchedule}
@@ -384,6 +404,7 @@ export default function App() {
                 onChangeMonth={(nextMonth) => setSelectedMonthKey(nextMonth)}
                 onCreateEntry={handleCreateEntry}
                 onToggleTask={toggleTaskStatus}
+                onTogglePriority={togglePriority}
                 onUpdateText={updateEntryContent}
                 onMigrate={handleMigrate}
                 onSchedule={handleSchedule}
@@ -403,8 +424,10 @@ export default function App() {
                 }}
                 onCreateEntry={handleCreateEntry}
                 onToggleTask={toggleTaskStatus}
+                onTogglePriority={togglePriority}
                 onUpdateText={updateEntryContent}
                 onMigrate={handleMigrate}
+                onMigrateMultiple={handleMigrateMultiple}
                 onSchedule={handleSchedule}
                 onDelete={handleDelete}
                 onNavigate={handleNavigate}

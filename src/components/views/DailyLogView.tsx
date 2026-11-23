@@ -23,6 +23,7 @@ import {
 } from '../../utils/date';
 import { EntryRow } from '../EntryRow';
 import { MiniDatePicker } from '../MiniDatePicker';
+import { MorningReviewBanner } from '../MorningReviewBanner';
 import { RapidInput } from '../RapidInput';
 
 interface DailyLogViewProps {
@@ -34,12 +35,19 @@ interface DailyLogViewProps {
     scope: LogScope,
     dateKey: string,
     type: BulletType,
-    rawText: string
+    rawText: string,
+    priority?: boolean
   ) => Promise<void>;
   onToggleTask: (entry: JournalEntry) => Promise<void>;
+  onTogglePriority: (entry: JournalEntry) => Promise<void>;
   onUpdateText: (entry: JournalEntry, rawText: string) => Promise<void>;
   onMigrate: (
     entry: JournalEntry,
+    targetScope: LogScope,
+    targetDateKey: string
+  ) => Promise<void>;
+  onMigrateMultiple: (
+    items: JournalEntry[],
     targetScope: LogScope,
     targetDateKey: string
   ) => Promise<void>;
@@ -55,8 +63,10 @@ export function DailyLogView({
   onChangeDate,
   onCreateEntry,
   onToggleTask,
+  onTogglePriority,
   onUpdateText,
   onMigrate,
+  onMigrateMultiple,
   onSchedule,
   onDelete,
   onNavigate,
@@ -173,12 +183,23 @@ export function DailyLogView({
         )}
       </header>
 
+      {/* Morning Routine Banner — only when viewing today */}
+      {isToday && (
+        <MorningReviewBanner
+          todayDateKey={dateKey}
+          entries={entries}
+          onMigrateOne={(entry) => onMigrate(entry, 'daily', dateKey)}
+          onMigrateAll={(items) => onMigrateMultiple(items, 'daily', dateKey)}
+          onDeleteOne={onDelete}
+        />
+      )}
+
       {/* Top Rapid Input — stays visible above mobile virtual keyboard */}
       <section className="mb-8" aria-label="빠른 입력">
         <RapidInput
           showHints
-          onSubmit={(type, rawText) =>
-            onCreateEntry('daily', dateKey, type, rawText)
+          onSubmit={(type, rawText, priority) =>
+            onCreateEntry('daily', dateKey, type, rawText, priority)
           }
         />
       </section>
@@ -192,6 +213,7 @@ export function DailyLogView({
             </p>
             <p className="mt-2 text-xs leading-relaxed text-zinc-400">
               <code className="font-mono text-zinc-500">. </code>할 일,{' '}
+              <code className="font-mono text-zinc-500">* </code>중요 할 일,{' '}
               <code className="font-mono text-zinc-500">o 14:30 </code>일정,{' '}
               <code className="font-mono text-zinc-500">- </code>메모 형식으로
               빠르게 적어 보세요.
@@ -206,6 +228,7 @@ export function DailyLogView({
                 allEntries={entries}
                 highlighted={highlightId === entry.id}
                 onToggleTask={onToggleTask}
+                onTogglePriority={onTogglePriority}
                 onUpdateText={onUpdateText}
                 onMigrate={onMigrate}
                 onSchedule={onSchedule}

@@ -14,6 +14,7 @@ export interface CreateEntryParams {
   dateKey: string;
   type: BulletType;
   rawText: string;
+  priority?: boolean;
 }
 
 export interface CalendarSyncResult {
@@ -116,6 +117,7 @@ export function useJournal(enabled = true) {
       dateKey,
       type,
       rawText,
+      priority = false,
     }: CreateEntryParams): Promise<JournalEntry | null> => {
       const trimmed = rawText.trim();
       if (!trimmed) return null;
@@ -139,6 +141,7 @@ export function useJournal(enabled = true) {
         type,
         status: 'open',
         content,
+        priority: Boolean(priority),
         eventTime,
         order: getNextOrder(scope, dateKey),
         migratedToId: null,
@@ -177,6 +180,16 @@ export function useJournal(enabled = true) {
       }
     } catch {
       setSyncError('상태 변경에 실패했습니다.');
+    }
+  }, []);
+
+  const togglePriority = useCallback(async (entry: JournalEntry): Promise<void> => {
+    try {
+      await journalRepository.updateEntry(entry.id, {
+        priority: !Boolean(entry.priority),
+      });
+    } catch {
+      setSyncError('중요 표시 변경에 실패했습니다.');
     }
   }, []);
 
@@ -258,6 +271,7 @@ export function useJournal(enabled = true) {
         type: entry.type,
         status: 'open',
         content: entry.content,
+        priority: Boolean(entry.priority),
         eventTime: entry.eventTime ?? null,
         order: getNextOrder(targetScope, targetDateKey),
         migratedToId: null,
@@ -283,6 +297,55 @@ export function useJournal(enabled = true) {
     [getNextOrder, pushCreatedEventToCalendar]
   );
 
+  const migrateMultipleEntries = useCallback(
+    async (
+      items: JournalEntry[],
+      targetScope: LogScope,
+      targetDateKey: string
+    ): Promise<number> => {
+      if (items.length === 0) return 0;
+
+      let nextOrder = getNextOrder(targetScope, targetDateKey);
+      let migratedCount = 0;
+
+      try {
+        for (const entry of items) {
+          const now = Date.now();
+          const newEntry: JournalEntry = {
+            id: generateId(),
+            scope: targetScope,
+            dateKey: targetDateKey,
+            type: entry.type,
+            status: 'open',
+            content: entry.content,
+            priority: Boolean(entry.priority),
+            eventTime: entry.eventTime ?? null,
+            order: nextOrder,
+            migratedToId: null,
+            googleEventId: null,
+            googleUpdatedAt: null,
+            createdAt: now,
+            updatedAt: now,
+          };
+          nextOrder += 1;
+
+          await journalRepository.addEntry(newEntry);
+          await journalRepository.updateEntry(entry.id, {
+            status: 'migrated',
+            migratedToId: newEntry.id,
+          });
+          void pushCreatedEventToCalendar(newEntry);
+          migratedCount += 1;
+        }
+        return migratedCount;
+      } catch {
+        setSyncError('항목 일괄 이동에 실패했습니다.');
+        return migratedCount;
+      }
+    },
+    [getNextOrder, pushCreatedEventToCalendar]
+  );
+
   const scheduleEntry = useCallback(
     async (
       entry: JournalEntry,
@@ -296,6 +359,7 @@ export function useJournal(enabled = true) {
         type: entry.type,
         status: 'open',
         content: entry.content,
+        priority: Boolean(entry.priority),
         eventTime: entry.eventTime ?? null,
         order: getNextOrder('future', futureMonthKey),
         migratedToId: null,
@@ -488,8 +552,10 @@ export function useJournal(enabled = true) {
     clearSyncError: useCallback(() => setSyncError(null), []),
     createEntry,
     toggleTaskStatus,
+    togglePriority,
     updateEntryContent,
     migrateEntry,
+    migrateMultipleEntries,
     scheduleEntry,
     deleteEntry,
     restoreEntry,

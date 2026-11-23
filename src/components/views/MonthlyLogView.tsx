@@ -27,9 +27,11 @@ interface MonthlyLogViewProps {
     scope: LogScope,
     dateKey: string,
     type: BulletType,
-    rawText: string
+    rawText: string,
+    priority?: boolean
   ) => Promise<void>;
   onToggleTask: (entry: JournalEntry) => Promise<void>;
+  onTogglePriority: (entry: JournalEntry) => Promise<void>;
   onUpdateText: (entry: JournalEntry, rawText: string) => Promise<void>;
   onMigrate: (
     entry: JournalEntry,
@@ -50,6 +52,7 @@ export function MonthlyLogView({
   onChangeMonth,
   onCreateEntry,
   onToggleTask,
+  onTogglePriority,
   onUpdateText,
   onMigrate,
   onSchedule,
@@ -338,8 +341,8 @@ export function MonthlyLogView({
             <RapidInput
               showHints
               placeholder="이번 달 할 일 또는 메모 입력..."
-              onSubmit={(type, rawText) =>
-                onCreateEntry('monthly', monthKey, type, rawText)
+              onSubmit={(type, rawText, priority) =>
+                onCreateEntry('monthly', monthKey, type, rawText, priority)
               }
             />
           </div>
@@ -362,6 +365,7 @@ export function MonthlyLogView({
                   allEntries={entries}
                   highlighted={highlightId === entry.id}
                   onToggleTask={onToggleTask}
+                  onTogglePriority={onTogglePriority}
                   onUpdateText={onUpdateText}
                   onMigrate={onMigrate}
                   onSchedule={onSchedule}

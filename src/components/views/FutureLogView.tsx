@@ -22,9 +22,11 @@ interface FutureLogViewProps {
     scope: LogScope,
     dateKey: string,
     type: BulletType,
-    rawText: string
+    rawText: string,
+    priority?: boolean
   ) => Promise<void>;
   onToggleTask: (entry: JournalEntry) => Promise<void>;
+  onTogglePriority: (entry: JournalEntry) => Promise<void>;
   onUpdateText: (entry: JournalEntry, rawText: string) => Promise<void>;
   onMigrate: (
     entry: JournalEntry,
@@ -42,6 +44,7 @@ export function FutureLogView({
   highlightId,
   onCreateEntry,
   onToggleTask,
+  onTogglePriority,
   onUpdateText,
   onMigrate,
   onSchedule,
@@ -171,6 +174,7 @@ export function FutureLogView({
                         allEntries={entries}
                         highlighted={highlightId === entry.id}
                         onToggleTask={onToggleTask}
+                        onTogglePriority={onTogglePriority}
                         onUpdateText={onUpdateText}
                         onMigrate={onMigrate}
                         onSchedule={onSchedule}
@@ -187,8 +191,8 @@ export function FutureLogView({
                 <RapidInput
                   compact
                   placeholder={`${formatMonthHeading(monthKey)} 항목 추가...`}
-                  onSubmit={(type, rawText) =>
-                    onCreateEntry('future', monthKey, type, rawText)
+                  onSubmit={(type, rawText, priority) =>
+                    onCreateEntry('future', monthKey, type, rawText, priority)
                   }
                 />
               </div>

@@ -9,6 +9,7 @@ export interface JournalEntry {
   type: BulletType;                // task(•), event(○), note(-)
   status: TaskStatus;              // task만 상태 변화 활용 (event/note는 기본 'open')
   content: string;                 // 본문 텍스트
+  priority?: boolean;              // 선택: 오리지널 시그니파이어 * (중요 표시)
   eventTime?: string | null;       // 선택: 'HH:mm' 형식 (예: '14:00' 입력 시 파싱, 없으면 종일 일정)
   order: number;                   // 같은 dateKey 내 정렬 순서
   migratedToId?: string | null;    // 마이그레이션 시 생성된 새 항목 ID

@@ -8,7 +8,11 @@ import {
 } from '../utils/rapidInput';
 
 interface RapidInputProps {
-  onSubmit: (type: BulletType, rawText: string) => void | Promise<void>;
+  onSubmit: (
+    type: BulletType,
+    rawText: string,
+    priority?: boolean
+  ) => void | Promise<void>;
   defaultType?: BulletType;
   placeholder?: string;
   compact?: boolean;
@@ -16,7 +20,12 @@ interface RapidInputProps {
   showHints?: boolean;
 }
 
-const TYPE_OPTIONS: Array<{ type: BulletType; symbol: string; label: string; shortcut: string }> = [
+const TYPE_OPTIONS: Array<{
+  type: BulletType;
+  symbol: string;
+  label: string;
+  shortcut: string;
+}> = [
   { type: 'task', symbol: '•', label: '할 일', shortcut: '. ' },
   { type: 'event', symbol: '○', label: '일정', shortcut: 'o ' },
   { type: 'note', symbol: '-', label: '메모', shortcut: '- ' },
@@ -31,6 +40,7 @@ export function RapidInput({
   showHints = false,
 }: RapidInputProps) {
   const [bulletType, setBulletType] = useState<BulletType>(defaultType);
+  const [priority, setPriority] = useState(false);
   const [text, setText] = useState('');
   const isComposingRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -40,24 +50,49 @@ export function RapidInput({
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
-    const { detectedType, remainingText } = detectRapidPrefix(raw);
+    const { detectedType, detectedPriority, remainingText } =
+      detectRapidPrefix(raw);
+
     if (detectedType) {
       setBulletType(detectedType);
+      if (detectedPriority) {
+        setPriority(true);
+      } else if (detectedType !== 'task') {
+        setPriority(false);
+      }
       setText(remainingText);
       return;
     }
+
     setText(raw);
   };
 
   const handleSubmit = async () => {
     const trimmed = text.trim();
     if (!trimmed) return;
-    await onSubmit(bulletType, trimmed);
+
+    // Safeguard for pasted text starting with "* " or "* . "
+    const detected = detectRapidPrefix(trimmed);
+    const effectiveType = detected.detectedType ?? bulletType;
+    const effectivePriority = detected.detectedPriority || priority;
+    const effectiveText = detected.detectedType
+      ? detected.remainingText.trim()
+      : trimmed;
+
+    if (!effectiveText) return;
+
+    await onSubmit(effectiveType, effectiveText, effectivePriority);
     setText('');
+    setPriority(false);
     inputRef.current?.focus();
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && text === '' && priority) {
+      setPriority(false);
+      return;
+    }
+
     if (e.key === 'Enter') {
       // Prevent duplicate submission during Korean IME composition
       if (isComposingRef.current || e.nativeEvent.isComposing) {
@@ -78,7 +113,7 @@ export function RapidInput({
   const resolvedPlaceholder =
     placeholder ??
     (bulletType === 'task'
-      ? '할 일 입력 (. 할 일, o 일정, - 메모)'
+      ? '할 일 입력 (. 할 일, * 중요, o 일정, - 메모)'
       : bulletType === 'event'
         ? '일정 입력 (예: 14:30 치과)'
         : '메모 입력');
@@ -132,6 +167,21 @@ export function RapidInput({
           </div>
         )}
 
+        {priority && (
+          <button
+            type="button"
+            onClick={() => {
+              setPriority(false);
+              inputRef.current?.focus();
+            }}
+            title="중요 표시(*) 해제"
+            aria-label="중요 표시 해제"
+            className="inline-flex items-center justify-center px-1.5 h-6 rounded bg-amber-50 border border-amber-200 text-amber-600 font-semibold text-sm leading-none shrink-0 hover:bg-amber-100 transition-colors"
+          >
+            *
+          </button>
+        )}
+
         <input
           ref={inputRef}
           type="text"
@@ -179,6 +229,10 @@ export function RapidInput({
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400 px-1">
           <span>
             <code className="font-mono text-zinc-500">. </code>할 일
+          </span>
+          <span aria-hidden="true">·</span>
+          <span>
+            <code className="font-mono text-zinc-500">* </code>중요 할 일
           </span>
           <span aria-hidden="true">·</span>
           <span>
