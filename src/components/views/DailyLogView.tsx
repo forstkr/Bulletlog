@@ -5,6 +5,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { useListReorder } from '../../hooks/useListReorder';
 import type {
   BulletType,
   JournalEntry,
@@ -53,6 +54,7 @@ interface DailyLogViewProps {
   ) => Promise<void>;
   onSchedule: (entry: JournalEntry, futureMonthKey: string) => Promise<void>;
   onDelete: (entry: JournalEntry) => Promise<void>;
+  onReorder: (orderedEntries: JournalEntry[]) => Promise<void>;
   onNavigate: (target: NavigationTarget) => void;
 }
 
@@ -69,6 +71,7 @@ export function DailyLogView({
   onMigrateMultiple,
   onSchedule,
   onDelete,
+  onReorder,
   onNavigate,
 }: DailyLogViewProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -80,6 +83,8 @@ export function DailyLogView({
         .sort((a, b) => a.order - b.order || a.createdAt - b.createdAt),
     [entries, dateKey]
   );
+
+  const { moveItem, getDragProps } = useListReorder(dayEntries, onReorder);
 
   const datesWithEntries = useMemo(() => {
     const set = new Set<string>();
@@ -221,7 +226,7 @@ export function DailyLogView({
           </div>
         ) : (
           <div className="space-y-0.5">
-            {dayEntries.map((entry) => (
+            {dayEntries.map((entry, index) => (
               <EntryRow
                 key={entry.id}
                 entry={entry}
@@ -234,6 +239,11 @@ export function DailyLogView({
                 onSchedule={onSchedule}
                 onDelete={onDelete}
                 onNavigate={onNavigate}
+                canMoveUp={index > 0}
+                canMoveDown={index < dayEntries.length - 1}
+                onMoveUp={() => moveItem(index, 'up')}
+                onMoveDown={() => moveItem(index, 'down')}
+                dragProps={getDragProps(entry)}
               />
             ))}
           </div>

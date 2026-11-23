@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { useListReorder } from '../../hooks/useListReorder';
 import type {
   BulletType,
   JournalEntry,
@@ -40,6 +41,7 @@ interface MonthlyLogViewProps {
   ) => Promise<void>;
   onSchedule: (entry: JournalEntry, futureMonthKey: string) => Promise<void>;
   onDelete: (entry: JournalEntry) => Promise<void>;
+  onReorder: (orderedEntries: JournalEntry[]) => Promise<void>;
   onNavigate: (target: NavigationTarget) => void;
 }
 
@@ -57,6 +59,7 @@ export function MonthlyLogView({
   onMigrate,
   onSchedule,
   onDelete,
+  onReorder,
   onNavigate,
 }: MonthlyLogViewProps) {
   const [mobileTab, setMobileTab] = useState<MobileTab>('calendar');
@@ -109,6 +112,11 @@ export function MonthlyLogView({
         .filter((e) => e.scope === 'monthly' && e.dateKey === monthKey)
         .sort((a, b) => a.order - b.order || a.createdAt - b.createdAt),
     [entries, monthKey]
+  );
+
+  const { moveItem, getDragProps } = useListReorder(
+    monthlyTaskEntries,
+    onReorder
   );
 
   const totalMonthEventsCount = useMemo(() => {
@@ -358,7 +366,7 @@ export function MonthlyLogView({
             </div>
           ) : (
             <div className="space-y-0.5">
-              {monthlyTaskEntries.map((entry) => (
+              {monthlyTaskEntries.map((entry, index) => (
                 <EntryRow
                   key={entry.id}
                   entry={entry}
@@ -371,6 +379,11 @@ export function MonthlyLogView({
                   onSchedule={onSchedule}
                   onDelete={onDelete}
                   onNavigate={onNavigate}
+                  canMoveUp={index > 0}
+                  canMoveDown={index < monthlyTaskEntries.length - 1}
+                  onMoveUp={() => moveItem(index, 'up')}
+                  onMoveDown={() => moveItem(index, 'down')}
+                  dragProps={getDragProps(entry)}
                 />
               ))}
             </div>

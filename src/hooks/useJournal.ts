@@ -193,6 +193,44 @@ export function useJournal(enabled = true) {
     }
   }, []);
 
+  const reorderEntries = useCallback(
+    async (orderedEntries: JournalEntry[]): Promise<void> => {
+      if (orderedEntries.length === 0) return;
+
+      const orderMap = new Map<string, number>();
+      orderedEntries.forEach((entry, index) => {
+        orderMap.set(entry.id, index);
+      });
+
+      // Optimistic local state update so reordering feels immediate
+      setEntries((prev) =>
+        prev.map((item) => {
+          const nextOrder = orderMap.get(item.id);
+          return nextOrder !== undefined && item.order !== nextOrder
+            ? { ...item, order: nextOrder }
+            : item;
+        })
+      );
+
+      const updates = orderedEntries
+        .map((entry, index) => ({ entry, index }))
+        .filter(({ entry, index }) => entry.order !== index);
+
+      if (updates.length === 0) return;
+
+      try {
+        await Promise.all(
+          updates.map(({ entry, index }) =>
+            journalRepository.updateEntry(entry.id, { order: index })
+          )
+        );
+      } catch {
+        setSyncError('항목 순서 저장에 실패했습니다.');
+      }
+    },
+    []
+  );
+
   const updateEntryContent = useCallback(
     async (
       entry: JournalEntry,
@@ -553,6 +591,7 @@ export function useJournal(enabled = true) {
     createEntry,
     toggleTaskStatus,
     togglePriority,
+    reorderEntries,
     updateEntryContent,
     migrateEntry,
     migrateMultipleEntries,

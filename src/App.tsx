@@ -24,7 +24,6 @@ import { getCurrentMonthKey, getTodayKey, toMonthKey } from './utils/date';
 
 interface ToastState {
   message: string;
-  undoEntry?: JournalEntry;
 }
 
 export default function App() {
@@ -52,12 +51,12 @@ export default function App() {
     createEntry,
     toggleTaskStatus,
     togglePriority,
+    reorderEntries,
     updateEntryContent,
     migrateEntry,
     migrateMultipleEntries,
     scheduleEntry,
     deleteEntry,
-    restoreEntry,
     syncFromGoogleCalendar,
   } = useJournal(isAuthenticated);
 
@@ -75,8 +74,14 @@ export default function App() {
   const [searchModalOpen, setSearchModalOpen] = useState(false);
   const [guideModalOpen, setGuideModalOpen] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<JournalEntry | null>(null);
+  const [committingDeleteIds, setCommittingDeleteIds] = useState<Set<string>>(
+    () => new Set()
+  );
 
   const toastTimerRef = useRef<number | null>(null);
+  const pendingDeleteRef = useRef<JournalEntry | null>(null);
+  const pendingDeleteTimerRef = useRef<number | null>(null);
   const highlightTimerRef = useRef<number | null>(null);
   const hasAutoSyncedRef = useRef(false);
 
@@ -93,6 +98,9 @@ export default function App() {
   useEffect(() => {
     return () => {
       if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+      if (pendingDeleteTimerRef.current) {
+        window.clearTimeout(pendingDeleteTimerRef.current);
+      }
       if (highlightTimerRef.current) {
         window.clearTimeout(highlightTimerRef.current);
       }
@@ -255,28 +263,96 @@ export default function App() {
     [scheduleEntry, showToast]
   );
 
-  const handleDelete = useCallback(
+  const commitDeleteEntry = useCallback(
     async (entry: JournalEntry) => {
-      await deleteEntry(entry.id);
-      showToast({
-        message: '항목을 삭제했습니다.',
-        undoEntry: entry,
+      setCommittingDeleteIds((prev) => {
+        const next = new Set(prev);
+        next.add(entry.id);
+        return next;
       });
+      try {
+        await deleteEntry(entry.id);
+      } finally {
+        setCommittingDeleteIds((prev) => {
+          if (!prev.has(entry.id)) return prev;
+          const next = new Set(prev);
+          next.delete(entry.id);
+          return next;
+        });
+      }
     },
-    [deleteEntry, showToast]
+    [deleteEntry]
   );
 
-  const handleUndoDelete = useCallback(async () => {
-    if (!toast?.undoEntry) return;
-    const entryToRestore = toast.undoEntry;
-    setToast(null);
-    await restoreEntry(entryToRestore);
-  }, [toast, restoreEntry]);
+  const handleDelete = useCallback(
+    async (entry: JournalEntry) => {
+      // Consecutive delete safety: immediately finalize previous pending deletion
+      if (pendingDeleteTimerRef.current !== null) {
+        window.clearTimeout(pendingDeleteTimerRef.current);
+        pendingDeleteTimerRef.current = null;
+      }
+      if (pendingDeleteRef.current && pendingDeleteRef.current.id !== entry.id) {
+        const previousEntry = pendingDeleteRef.current;
+        pendingDeleteRef.current = null;
+        void commitDeleteEntry(previousEntry);
+      }
+
+      // Hide entry locally without calling Firestore or Google Calendar API yet
+      pendingDeleteRef.current = entry;
+      setPendingDelete(entry);
+
+      // Commit real Firestore + Google Calendar deletion after 5 seconds
+      pendingDeleteTimerRef.current = window.setTimeout(() => {
+        pendingDeleteTimerRef.current = null;
+        const target = pendingDeleteRef.current;
+        pendingDeleteRef.current = null;
+        setPendingDelete(null);
+        if (target) {
+          void commitDeleteEntry(target);
+        }
+      }, 5000);
+    },
+    [commitDeleteEntry]
+  );
+
+  const handleUndoDelete = useCallback(() => {
+    if (pendingDeleteTimerRef.current !== null) {
+      window.clearTimeout(pendingDeleteTimerRef.current);
+      pendingDeleteTimerRef.current = null;
+    }
+    pendingDeleteRef.current = null;
+    setPendingDelete(null);
+  }, []);
+
+  const handleSignOut = useCallback(async () => {
+    if (pendingDeleteTimerRef.current !== null) {
+      window.clearTimeout(pendingDeleteTimerRef.current);
+      pendingDeleteTimerRef.current = null;
+    }
+    if (pendingDeleteRef.current) {
+      const target = pendingDeleteRef.current;
+      pendingDeleteRef.current = null;
+      setPendingDelete(null);
+      await commitDeleteEntry(target);
+    }
+    await signOutUser();
+  }, [commitDeleteEntry, signOutUser]);
+
+  const visibleEntries = useMemo(() => {
+    const pendingId = pendingDelete?.id;
+    if (!pendingId && committingDeleteIds.size === 0) {
+      return entries;
+    }
+    return entries.filter(
+      (item) => item.id !== pendingId && !committingDeleteIds.has(item.id)
+    );
+  }, [entries, pendingDelete, committingDeleteIds]);
 
   const openTaskCount = useMemo(
     () =>
-      entries.filter((e) => e.type === 'task' && e.status === 'open').length,
-    [entries]
+      visibleEntries.filter((e) => e.type === 'task' && e.status === 'open')
+        .length,
+    [visibleEntries]
   );
 
   if (authStatus === 'loading') {
@@ -324,7 +400,7 @@ export default function App() {
         onOpenGuide={() => setGuideModalOpen(true)}
         openTaskCount={openTaskCount}
         userEmail={user?.email}
-        onSignOut={signOutUser}
+        onSignOut={handleSignOut}
       />
 
       {/* Main Content Area */}
@@ -373,16 +449,16 @@ export default function App() {
           <>
             {activeView === 'index' && (
               <IndexView
-                entries={entries}
+                entries={visibleEntries}
                 onNavigate={handleNavigate}
                 userEmail={user?.email}
-                onSignOut={signOutUser}
+                onSignOut={handleSignOut}
               />
             )}
 
             {activeView === 'future' && (
               <FutureLogView
-                entries={entries}
+                entries={visibleEntries}
                 focusMonthKey={futureFocusMonthKey}
                 highlightId={highlightId}
                 onCreateEntry={handleCreateEntry}
@@ -399,7 +475,7 @@ export default function App() {
             {activeView === 'monthly' && (
               <MonthlyLogView
                 monthKey={selectedMonthKey}
-                entries={entries}
+                entries={visibleEntries}
                 highlightId={highlightId}
                 onChangeMonth={(nextMonth) => setSelectedMonthKey(nextMonth)}
                 onCreateEntry={handleCreateEntry}
@@ -409,6 +485,7 @@ export default function App() {
                 onMigrate={handleMigrate}
                 onSchedule={handleSchedule}
                 onDelete={handleDelete}
+                onReorder={reorderEntries}
                 onNavigate={handleNavigate}
               />
             )}
@@ -416,7 +493,7 @@ export default function App() {
             {activeView === 'daily' && (
               <DailyLogView
                 dateKey={selectedDateKey}
-                entries={entries}
+                entries={visibleEntries}
                 highlightId={highlightId}
                 onChangeDate={(nextDate) => {
                   setSelectedDateKey(nextDate);
@@ -430,13 +507,14 @@ export default function App() {
                 onMigrateMultiple={handleMigrateMultiple}
                 onSchedule={handleSchedule}
                 onDelete={handleDelete}
+                onReorder={reorderEntries}
                 onNavigate={handleNavigate}
               />
             )}
 
             {activeView === 'search' && (
               <SearchPanel
-                entries={entries}
+                entries={visibleEntries}
                 mode="page"
                 onSelectResult={handleNavigate}
               />
@@ -457,7 +535,7 @@ export default function App() {
       {/* Desktop Ctrl+K Search Modal */}
       {searchModalOpen && (
         <SearchPanel
-          entries={entries}
+          entries={visibleEntries}
           mode="modal"
           onSelectResult={handleNavigate}
           onClose={() => setSearchModalOpen(false)}
@@ -470,23 +548,35 @@ export default function App() {
         onClose={() => setGuideModalOpen(false)}
       />
 
-      {/* Subtle Action / Undo Toast */}
-      {toast && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-6 z-50 flex items-center gap-3 rounded-lg bg-zinc-900 text-white px-4 py-2.5 text-xs shadow-lg shadow-zinc-900/15"
-        >
-          <span className="whitespace-nowrap">{toast.message}</span>
-          {toast.undoEntry && (
-            <button
-              type="button"
-              onClick={() => void handleUndoDelete()}
-              className="inline-flex items-center gap-1 font-medium text-zinc-200 hover:text-white underline underline-offset-2 whitespace-nowrap"
+      {/* Bottom-Center Toast Stack (Deferred Delete Undo + Action Feedback) */}
+      {(pendingDelete || toast) && (
+        <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none px-4 max-w-[calc(100vw-2rem)]">
+          {toast && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="pointer-events-auto flex items-center gap-3 rounded-lg bg-zinc-900 text-white px-4 py-2.5 text-xs shadow-lg shadow-zinc-900/15"
             >
-              <RotateCcw className="w-3 h-3" />
-              <span>실행 취소</span>
-            </button>
+              <span className="whitespace-nowrap">{toast.message}</span>
+            </div>
+          )}
+
+          {pendingDelete && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="pointer-events-auto flex items-center gap-3 rounded-lg bg-zinc-900 text-white px-4 py-2.5 text-xs shadow-lg shadow-zinc-900/15"
+            >
+              <span className="whitespace-nowrap">항목이 삭제되었습니다.</span>
+              <button
+                type="button"
+                onClick={handleUndoDelete}
+                className="inline-flex items-center gap-1 rounded px-2 py-1 -mr-1 font-medium text-white bg-white/15 hover:bg-white/25 transition-colors whitespace-nowrap"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>실행 취소</span>
+              </button>
+            </div>
           )}
         </div>
       )}

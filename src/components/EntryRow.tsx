@@ -2,6 +2,8 @@ import {
   ArrowRight,
   CalendarClock,
   Check,
+  ChevronDown,
+  ChevronUp,
   MoreHorizontal,
   Pencil,
   Star,
@@ -9,6 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
+import type { EntryDragProps } from '../hooks/useListReorder';
 import type { JournalEntry, LogScope, NavigationTarget } from '../types/journal';
 import {
   formatDailyCompact,
@@ -37,6 +40,11 @@ interface EntryRowProps {
   onDelete: (entry: JournalEntry) => void | Promise<void>;
   onNavigate?: (target: NavigationTarget) => void;
   compact?: boolean;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  dragProps?: EntryDragProps;
 }
 
 type ActivePanel = 'none' | 'migrate' | 'schedule';
@@ -53,6 +61,11 @@ export function EntryRow({
   onDelete,
   onNavigate,
   compact = false,
+  canMoveUp = false,
+  canMoveDown = false,
+  onMoveUp,
+  onMoveDown,
+  dragProps,
 }: EntryRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
@@ -102,7 +115,36 @@ export function EntryRow({
     setIsEditing(false);
   };
 
+  const reorderEnabled = Boolean(onMoveUp || onMoveDown);
+
+  const triggerMoveWithFocus = (
+    direction: 'up' | 'down',
+    focusTarget: 'input' | 'row'
+  ) => {
+    if (direction === 'up' && canMoveUp && onMoveUp) {
+      onMoveUp();
+    } else if (direction === 'down' && canMoveDown && onMoveDown) {
+      onMoveDown();
+    } else {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      if (focusTarget === 'input') {
+        editInputRef.current?.focus();
+      } else {
+        rowRef.current?.focus();
+      }
+    });
+  };
+
   const handleEditKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (reorderEnabled && e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+      e.preventDefault();
+      e.stopPropagation();
+      triggerMoveWithFocus(e.key === 'ArrowUp' ? 'up' : 'down', 'input');
+      return;
+    }
     if (e.key === 'Enter') {
       if (isComposingRef.current || e.nativeEvent.isComposing) return;
       e.preventDefault();
@@ -111,6 +153,19 @@ export function EntryRow({
       e.preventDefault();
       cancelEdit();
     }
+  };
+
+  const handleRowKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (
+      !reorderEnabled ||
+      isEditing ||
+      !e.altKey ||
+      (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')
+    ) {
+      return;
+    }
+    e.preventDefault();
+    triggerMoveWithFocus(e.key === 'ArrowUp' ? 'up' : 'down', 'row');
   };
 
   const migratedTarget = entry.migratedToId
@@ -149,13 +204,40 @@ export function EntryRow({
         : `${formatMonthHeading(migratedTarget.dateKey)} 퓨처`
     : null;
 
+  const isDraggable =
+    Boolean(dragProps?.draggable) && !isEditing && activePanel === 'none';
+
   return (
     <div
       ref={rowRef}
-      className={`group relative rounded-lg transition-colors ${
+      tabIndex={reorderEnabled ? 0 : undefined}
+      onKeyDown={handleRowKeyDown}
+      draggable={isDraggable}
+      onDragStart={isDraggable ? dragProps?.onDragStart : undefined}
+      onDragOver={dragProps?.onDragOver}
+      onDragLeave={dragProps?.onDragLeave}
+      onDrop={dragProps?.onDrop}
+      onDragEnd={dragProps?.onDragEnd}
+      className={`group relative rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-300 ${
         highlighted ? 'bg-zinc-100' : 'hover:bg-zinc-50/90'
+      } ${dragProps?.isDragging ? 'opacity-40' : ''} ${
+        isDraggable ? 'md:cursor-grab md:active:cursor-grabbing' : ''
       }`}
     >
+      {/* Thin horizontal drop guideline for desktop HTML5 drag-and-drop */}
+      {dragProps?.dropPosition === 'before' && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute left-1.5 right-1.5 -top-[1px] h-0.5 rounded-full bg-zinc-900 z-10"
+        />
+      )}
+      {dragProps?.dropPosition === 'after' && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute left-1.5 right-1.5 -bottom-[1px] h-0.5 rounded-full bg-zinc-900 z-10"
+        />
+      )}
+
       <div
         className={`flex items-start gap-2 ${
           compact ? 'py-1.5 px-1' : 'py-2 px-1.5'
@@ -259,6 +341,30 @@ export function EntryRow({
                 : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
             }`}
           >
+            {reorderEnabled && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onMoveUp?.()}
+                  disabled={!canMoveUp}
+                  title="위로 이동 (Alt+↑)"
+                  aria-label="위로 이동"
+                  className="flex items-center justify-center w-7 h-8 rounded-md text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-zinc-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900"
+                >
+                  <ChevronUp className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onMoveDown?.()}
+                  disabled={!canMoveDown}
+                  title="아래로 이동 (Alt+↓)"
+                  aria-label="아래로 이동"
+                  className="flex items-center justify-center w-7 h-8 rounded-md text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-zinc-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900"
+                >
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </button>
+              </>
+            )}
             <button
               type="button"
               onClick={() => void onTogglePriority(entry)}
@@ -358,70 +464,97 @@ export function EntryRow({
 
       {/* Mobile expanded action bar (all >= 40x40px touch targets) */}
       {mobileMenuOpen && !isEditing && (
-        <div
-          className={`md:hidden grid gap-1 px-2 pb-2 pt-0.5 ${
-            canMigrateOrSchedule ? 'grid-cols-5' : 'grid-cols-3'
-          }`}
-        >
-          <button
-            type="button"
-            onClick={() => {
-              setMobileMenuOpen(false);
-              void onTogglePriority(entry);
-            }}
-            aria-pressed={Boolean(entry.priority)}
-            className={`flex items-center justify-center gap-1 min-h-[40px] rounded-md border text-[11px] font-medium whitespace-nowrap ${
-              entry.priority
-                ? 'border-amber-200 bg-amber-50 text-amber-700 active:bg-amber-100'
-                : 'border-zinc-200 bg-white text-zinc-700 active:bg-zinc-100'
+        <div className="md:hidden px-2 pb-2 pt-0.5 space-y-1">
+          <div
+            className={`grid gap-1 ${
+              canMigrateOrSchedule ? 'grid-cols-5' : 'grid-cols-3'
             }`}
           >
-            <Star
-              className={`w-3.5 h-3.5 shrink-0 ${
-                entry.priority ? 'fill-amber-400 text-amber-500' : ''
+            <button
+              type="button"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                void onTogglePriority(entry);
+              }}
+              aria-pressed={Boolean(entry.priority)}
+              className={`flex items-center justify-center gap-1 min-h-[40px] rounded-md border text-[11px] font-medium whitespace-nowrap ${
+                entry.priority
+                  ? 'border-amber-200 bg-amber-50 text-amber-700 active:bg-amber-100'
+                  : 'border-zinc-200 bg-white text-zinc-700 active:bg-zinc-100'
               }`}
-            />
-            <span>중요</span>
-          </button>
-          {canMigrateOrSchedule && (
-            <>
+            >
+              <Star
+                className={`w-3.5 h-3.5 shrink-0 ${
+                  entry.priority ? 'fill-amber-400 text-amber-500' : ''
+                }`}
+              />
+              <span>중요</span>
+            </button>
+            {canMigrateOrSchedule && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleMigrateClick}
+                  className="flex items-center justify-center gap-1 min-h-[40px] rounded-md border border-zinc-200 bg-white text-[11px] font-medium text-zinc-700 active:bg-zinc-100 whitespace-nowrap"
+                >
+                  <span className="font-mono">&gt;</span>
+                  <span>{entry.scope === 'future' ? '먼슬리' : '미루기'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleScheduleClick}
+                  className="flex items-center justify-center gap-1 min-h-[40px] rounded-md border border-zinc-200 bg-white text-[11px] font-medium text-zinc-700 active:bg-zinc-100 whitespace-nowrap"
+                >
+                  <span className="font-mono">&lt;</span>
+                  <span>스케줄</span>
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={startEdit}
+              className="flex items-center justify-center gap-1 min-h-[40px] rounded-md border border-zinc-200 bg-white text-[11px] font-medium text-zinc-700 active:bg-zinc-100 whitespace-nowrap"
+            >
+              <Pencil className="w-3.5 h-3.5 shrink-0" />
+              <span>수정</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                void onDelete(entry);
+              }}
+              className="flex items-center justify-center gap-1 min-h-[40px] rounded-md border border-zinc-200 bg-white text-[11px] font-medium text-red-600 active:bg-red-50 whitespace-nowrap"
+            >
+              <Trash2 className="w-3.5 h-3.5 shrink-0" />
+              <span>삭제</span>
+            </button>
+          </div>
+
+          {reorderEnabled && (
+            <div className="grid grid-cols-2 gap-1">
               <button
                 type="button"
-                onClick={handleMigrateClick}
-                className="flex items-center justify-center gap-1 min-h-[40px] rounded-md border border-zinc-200 bg-white text-[11px] font-medium text-zinc-700 active:bg-zinc-100 whitespace-nowrap"
+                onClick={() => onMoveUp?.()}
+                disabled={!canMoveUp}
+                aria-label="위로 이동"
+                className="flex items-center justify-center gap-1 min-h-[40px] rounded-md border border-zinc-200 bg-white text-[11px] font-medium text-zinc-700 active:bg-zinc-100 disabled:opacity-35 disabled:active:bg-white whitespace-nowrap"
               >
-                <span className="font-mono">&gt;</span>
-                <span>{entry.scope === 'future' ? '먼슬리' : '미루기'}</span>
+                <ChevronUp className="w-3.5 h-3.5 shrink-0" />
+                <span>위로</span>
               </button>
               <button
                 type="button"
-                onClick={handleScheduleClick}
-                className="flex items-center justify-center gap-1 min-h-[40px] rounded-md border border-zinc-200 bg-white text-[11px] font-medium text-zinc-700 active:bg-zinc-100 whitespace-nowrap"
+                onClick={() => onMoveDown?.()}
+                disabled={!canMoveDown}
+                aria-label="아래로 이동"
+                className="flex items-center justify-center gap-1 min-h-[40px] rounded-md border border-zinc-200 bg-white text-[11px] font-medium text-zinc-700 active:bg-zinc-100 disabled:opacity-35 disabled:active:bg-white whitespace-nowrap"
               >
-                <span className="font-mono">&lt;</span>
-                <span>스케줄</span>
+                <ChevronDown className="w-3.5 h-3.5 shrink-0" />
+                <span>아래로</span>
               </button>
-            </>
+            </div>
           )}
-          <button
-            type="button"
-            onClick={startEdit}
-            className="flex items-center justify-center gap-1 min-h-[40px] rounded-md border border-zinc-200 bg-white text-[11px] font-medium text-zinc-700 active:bg-zinc-100 whitespace-nowrap"
-          >
-            <Pencil className="w-3.5 h-3.5 shrink-0" />
-            <span>수정</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMobileMenuOpen(false);
-              void onDelete(entry);
-            }}
-            className="flex items-center justify-center gap-1 min-h-[40px] rounded-md border border-zinc-200 bg-white text-[11px] font-medium text-red-600 active:bg-red-50 whitespace-nowrap"
-          >
-            <Trash2 className="w-3.5 h-3.5 shrink-0" />
-            <span>삭제</span>
-          </button>
         </div>
       )}
 
