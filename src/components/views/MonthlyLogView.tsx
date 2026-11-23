@@ -223,11 +223,16 @@ export function MonthlyLogView({
                 {monthlyEvents.map((ev) => (
                   <li
                     key={ev.id}
-                    className="flex items-baseline gap-2 text-sm text-zinc-800"
+                    className="flex items-start gap-2 text-sm leading-5 text-zinc-800"
                   >
-                    <span className="font-mono text-zinc-600 shrink-0">○</span>
+                    <span className="w-4 h-5 flex items-center justify-center shrink-0">
+                      <span
+                        aria-hidden="true"
+                        className="w-2.5 h-2.5 rounded-full border-[1.5px] border-neutral-700"
+                      />
+                    </span>
                     {ev.eventTime && (
-                      <span className="font-mono tabular-nums text-xs text-zinc-500 shrink-0">
+                      <span className="font-mono tabular-nums text-xs leading-5 text-zinc-500 shrink-0">
                         {ev.eventTime}
                       </span>
                     )}
@@ -255,7 +260,7 @@ export function MonthlyLogView({
                     day.isToday ? 'bg-zinc-100/80' : ''
                   }`}
                 >
-                  <div className="flex items-center gap-2 w-14 shrink-0 pt-0.5 tabular-nums">
+                  <div className="flex items-center gap-2 w-14 shrink-0 h-5 tabular-nums">
                     <span
                       className={`font-mono text-xs w-5 text-right ${
                         day.isToday
@@ -290,13 +295,16 @@ export function MonthlyLogView({
                         {dayEvents.map((ev) => (
                           <div
                             key={ev.id}
-                            className="flex items-baseline gap-1.5 text-sm leading-snug text-zinc-800"
+                            className="flex items-start gap-1.5 text-sm leading-5 text-zinc-800"
                           >
-                            <span className="font-mono text-xs text-zinc-500 shrink-0">
-                              ○
+                            <span className="w-4 h-5 flex items-center justify-center shrink-0">
+                              <span
+                                aria-hidden="true"
+                                className="w-2.5 h-2.5 rounded-full border-[1.5px] border-neutral-700"
+                              />
                             </span>
                             {ev.eventTime && (
-                              <span className="font-mono tabular-nums text-xs text-zinc-500 shrink-0">
+                              <span className="font-mono tabular-nums text-xs leading-5 text-zinc-500 shrink-0">
                                 {ev.eventTime}
                               </span>
                             )}

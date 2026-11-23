@@ -154,8 +154,8 @@ export function EntryRow({
       }`}
     >
       <div
-        className={`flex items-start gap-1 ${
-          compact ? 'py-1 px-1' : 'py-1.5 px-1.5'
+        className={`flex items-start gap-2 ${
+          compact ? 'py-1.5 px-1' : 'py-2 px-1.5'
         }`}
       >
         <BulletGlyph
@@ -163,12 +163,11 @@ export function EntryRow({
           status={entry.status}
           interactive={entry.type === 'task'}
           onClick={() => void onToggleTask(entry)}
-          size={compact ? 'sm' : 'md'}
         />
 
-        <div className="flex-1 min-w-0 pt-2 md:pt-1.5">
+        <div className="flex-1 min-w-0">
           {isEditing ? (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 -my-1">
               <input
                 ref={editInputRef}
                 type="text"
@@ -181,7 +180,7 @@ export function EntryRow({
                 onCompositionEnd={() => {
                   isComposingRef.current = false;
                 }}
-                className="flex-1 min-w-0 rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-[15px] text-zinc-900 focus:border-zinc-500 focus:outline-none"
+                className="flex-1 min-w-0 rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-[15px] leading-6 text-zinc-900 focus:border-zinc-500 focus:outline-none"
               />
               <button
                 type="button"
@@ -206,12 +205,12 @@ export function EntryRow({
               className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 break-words"
             >
               {entry.type === 'event' && entry.eventTime && (
-                <span className="font-mono tabular-nums text-xs font-medium text-zinc-500">
+                <span className="font-mono tabular-nums text-xs leading-6 font-medium text-zinc-500">
                   {entry.eventTime}
                 </span>
               )}
               <span
-                className={`text-[15px] leading-relaxed ${
+                className={`text-[15px] leading-6 ${
                   isDone
                     ? 'line-through text-zinc-400'
                     : isFaded
@@ -233,7 +232,7 @@ export function EntryRow({
                       highlightId: migratedTarget.id,
                     })
                   }
-                  className="text-xs text-zinc-400 hover:text-zinc-700 hover:underline transition-colors whitespace-nowrap"
+                  className="text-xs leading-6 text-zinc-400 hover:text-zinc-700 hover:underline transition-colors whitespace-nowrap"
                 >
                   {entry.status === 'scheduled' ? '← ' : '→ '}
                   {migratedTargetLabel}
@@ -246,7 +245,7 @@ export function EntryRow({
         {/* Desktop hover/focus mini actions */}
         {!isEditing && (
           <div
-            className={`hidden md:flex items-center gap-0.5 shrink-0 pt-0.5 transition-opacity ${
+            className={`hidden md:flex items-center gap-0.5 shrink-0 h-6 transition-opacity ${
               activePanel !== 'none'
                 ? 'opacity-100'
                 : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
@@ -312,7 +311,7 @@ export function EntryRow({
 
         {/* Mobile touch-friendly action toggle (40x40px hitbox) */}
         {!isEditing && (
-          <div className="flex md:hidden items-center shrink-0">
+          <div className="flex md:hidden items-center h-6 shrink-0">
             <button
               type="button"
               onClick={() => {
@@ -321,7 +320,7 @@ export function EntryRow({
               }}
               aria-label="항목 작업 열기"
               aria-expanded={mobileMenuOpen}
-              className={`flex items-center justify-center w-10 h-10 rounded-md transition-colors ${
+              className={`flex items-center justify-center w-10 h-10 -my-2 -mr-1 rounded-md transition-colors ${
                 mobileMenuOpen
                   ? 'bg-zinc-100 text-zinc-900'
                   : 'text-zinc-400 active:bg-zinc-100'

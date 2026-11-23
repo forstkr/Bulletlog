@@ -1,12 +1,74 @@
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import type { BulletType, TaskStatus } from '../types/journal';
-import { getBulletLabel, getBulletSymbol } from '../utils/rapidInput';
+import { getBulletLabel } from '../utils/rapidInput';
 
 interface BulletGlyphProps {
   type: BulletType;
   status: TaskStatus;
   interactive?: boolean;
   onClick?: () => void;
-  size?: 'sm' | 'md';
+}
+
+function renderSymbol(type: BulletType, status: TaskStatus) {
+  if (type === 'event') {
+    return (
+      <span
+        aria-hidden="true"
+        className="w-2.5 h-2.5 rounded-full border-[1.5px] border-neutral-700"
+      />
+    );
+  }
+
+  if (type === 'note') {
+    return (
+      <span
+        aria-hidden="true"
+        className="w-2.5 h-[1.5px] rounded-full bg-neutral-500"
+      />
+    );
+  }
+
+  switch (status) {
+    case 'done':
+      return (
+        <X
+          aria-hidden="true"
+          className="w-3.5 h-3.5 text-neutral-400"
+          strokeWidth={2.2}
+        />
+      );
+    case 'migrated':
+      return (
+        <ChevronRight
+          aria-hidden="true"
+          className="w-3.5 h-3.5 text-neutral-400"
+          strokeWidth={2.2}
+        />
+      );
+    case 'scheduled':
+      return (
+        <ChevronLeft
+          aria-hidden="true"
+          className="w-3.5 h-3.5 text-neutral-400"
+          strokeWidth={2.2}
+        />
+      );
+    case 'cancelled':
+      return (
+        <span
+          aria-hidden="true"
+          className="w-2.5 h-[1.5px] rounded-full bg-neutral-300"
+        />
+      );
+    case 'open':
+    default:
+      return (
+        <span
+          aria-hidden="true"
+          className="w-1.5 h-1.5 rounded-full bg-neutral-800"
+        />
+      );
+  }
 }
 
 export function BulletGlyph({
@@ -14,35 +76,17 @@ export function BulletGlyph({
   status,
   interactive = false,
   onClick,
-  size = 'md',
 }: BulletGlyphProps) {
-  const symbol = getBulletSymbol(type, status);
   const label = getBulletLabel(type, status);
-
-  const colorClass = (() => {
-    if (type === 'event') return 'text-zinc-800';
-    if (type === 'note') return 'text-zinc-500';
-    if (status === 'open') return 'text-zinc-900';
-    if (status === 'done') return 'text-zinc-400';
-    return 'text-zinc-400';
-  })();
-
-  const glyphSizeClass =
-    type === 'task' && status === 'open'
-      ? size === 'sm'
-        ? 'text-base leading-none'
-        : 'text-xl leading-none'
-      : size === 'sm'
-        ? 'text-sm leading-none'
-        : 'text-base leading-none';
+  const symbolNode = renderSymbol(type, status);
 
   if (!interactive) {
     return (
       <span
         aria-label={label}
-        className={`inline-flex items-center justify-center font-mono select-none ${colorClass} ${glyphSizeClass}`}
+        className="w-7 h-6 p-0 m-0 flex items-center justify-center shrink-0 select-none"
       >
-        {symbol}
+        {symbolNode}
       </span>
     );
   }
@@ -65,19 +109,9 @@ export function BulletGlyph({
             : '미완료로 되돌리기 (•)'
           : label
       }
-      className={`inline-flex items-center justify-center shrink-0 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 ${
-        size === 'sm'
-          ? 'w-9 h-9 md:w-7 md:h-7'
-          : 'w-10 h-10 md:w-8 md:h-8'
-      } ${
-        type === 'task'
-          ? 'hover:bg-zinc-100 active:bg-zinc-200'
-          : 'cursor-default'
-      }`}
+      className="relative w-7 h-6 p-0 m-0 flex items-center justify-center shrink-0 rounded-md transition-colors hover:bg-zinc-100 active:bg-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 before:content-[''] before:absolute before:-inset-2 md:before:inset-0"
     >
-      <span className={`font-mono select-none ${colorClass} ${glyphSizeClass}`}>
-        {symbol}
-      </span>
+      {symbolNode}
     </button>
   );
 }

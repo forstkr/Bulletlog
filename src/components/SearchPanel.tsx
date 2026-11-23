@@ -282,27 +282,21 @@ export function SearchPanel({
                 onMouseEnter={() => {
                   if (mode === 'modal') setActiveIndex(idx);
                 }}
-                className={`w-full flex items-start gap-3 px-4 py-3 text-left transition-colors ${
+                className={`w-full flex items-start gap-2 px-4 py-3 text-left transition-colors ${
                   isSelected ? 'bg-zinc-100/90' : 'hover:bg-zinc-50'
                 }`}
               >
-                <span className="pt-0.5 w-5 flex justify-center shrink-0">
-                  <BulletGlyph
-                    type={entry.type}
-                    status={entry.status}
-                    size="sm"
-                  />
-                </span>
+                <BulletGlyph type={entry.type} status={entry.status} />
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-2 flex-wrap">
                     {entry.type === 'event' && entry.eventTime && (
-                      <span className="font-mono tabular-nums text-xs text-zinc-500">
+                      <span className="font-mono tabular-nums text-xs leading-6 text-zinc-500">
                         {entry.eventTime}
                       </span>
                     )}
                     <span
-                      className={`text-sm leading-relaxed break-words ${
+                      className={`text-[15px] leading-6 break-words ${
                         isDone
                           ? 'line-through text-zinc-400'
                           : isFaded
