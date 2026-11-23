@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // SPEC.md Section 6: Single-user restriction
+    // Replace forstkr@gmail.com with your actual Google account email before deploying.
+    function isAllowedUser() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email == "forstkr@gmail.com";
+    }
+
+    function isValidEntry(data) {
+      return data.keys().hasAll([
+          'id', 'scope', 'dateKey', 'type', 'status',
+          'content', 'order', 'createdAt', 'updatedAt'
+        ])
+        && data.id is string
+        && data.scope in ['future', 'monthly', 'daily']
+        && data.dateKey is string
+        && data.type in ['task', 'event', 'note']
+        && data.status in ['open', 'done', 'migrated', 'scheduled', 'cancelled']
+        && data.content is string
+        && data.content.size() > 0
+        && data.content.size() <= 2000
+        && data.order is number
+        && data.createdAt is number
+        && data.updatedAt is number;
+    }
+
+    match /entries/{entryId} {
+      allow read: if isAllowedUser();
+      allow create, update: if isAllowedUser() && isValidEntry(request.resource.data);
+      allow delete: if isAllowedUser();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

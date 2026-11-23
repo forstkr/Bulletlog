@@ -1,0 +1,6 @@
+{
+  "name": "Bulletlog",
+  "description": "개인용 미니멀 불렛저널 웹앱 — 인덱스, 퓨처, 먼슬리, 데일리 로그와 래피드 로깅",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
