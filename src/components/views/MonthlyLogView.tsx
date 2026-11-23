@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ListChecks } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useListReorder } from '../../hooks/useListReorder';
 import type {
@@ -17,6 +17,7 @@ import {
   toMonthKey,
 } from '../../utils/date';
 import { EntryRow } from '../EntryRow';
+import { MonthlyMigrationModal } from '../MonthlyMigrationModal';
 import { RapidInput } from '../RapidInput';
 
 interface MonthlyLogViewProps {
@@ -68,6 +69,7 @@ export function MonthlyLogView({
   onNavigate,
 }: MonthlyLogViewProps) {
   const [mobileTab, setMobileTab] = useState<MobileTab>('calendar');
+  const [migrationModalOpen, setMigrationModalOpen] = useState(false);
   const days = useMemo(() => getDaysInMonthList(monthKey), [monthKey]);
 
   // All daily events in this month grouped by 'YYYY-MM-DD'
@@ -140,6 +142,36 @@ export function MonthlyLogView({
     [monthlyTaskEntries]
   );
 
+  // All open tasks across both monthly log and daily logs in this month for end-of-month review
+  const monthlyMigrationTasks = useMemo(() => {
+    const monthlyOpen = entries
+      .filter(
+        (e) =>
+          e.scope === 'monthly' &&
+          e.dateKey === monthKey &&
+          e.type === 'task' &&
+          e.status === 'open'
+      )
+      .sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
+
+    const dailyOpen = entries
+      .filter(
+        (e) =>
+          e.scope === 'daily' &&
+          toMonthKey(e.dateKey) === monthKey &&
+          e.type === 'task' &&
+          e.status === 'open'
+      )
+      .sort(
+        (a, b) =>
+          a.dateKey.localeCompare(b.dateKey) ||
+          a.order - b.order ||
+          a.createdAt - b.createdAt
+      );
+
+    return [...monthlyOpen, ...dailyOpen];
+  }, [entries, monthKey]);
+
   return (
     <div className="max-w-6xl mx-auto px-5 py-8 md:px-10 md:py-12">
       {/* Month navigation header */}
@@ -168,7 +200,7 @@ export function MonthlyLogView({
           </button>
         </div>
 
-        <div className="flex items-center gap-3 text-xs text-zinc-500">
+        <div className="flex items-center gap-2 sm:gap-3 text-xs text-zinc-500">
           {!isCurrentMonthKey(monthKey) && (
             <button
               type="button"
@@ -178,9 +210,21 @@ export function MonthlyLogView({
               이번 달
             </button>
           )}
-          <span className="hidden sm:inline tabular-nums">
+          <span className="hidden lg:inline tabular-nums">
             일정 {totalMonthEventsCount} · 월간 미완료 {openMonthlyTasksCount}
           </span>
+          <button
+            type="button"
+            onClick={() => setMigrationModalOpen(true)}
+            className="inline-flex items-center gap-1.5 min-h-[40px] md:min-h-[34px] px-3 py-1.5 rounded-lg border border-zinc-200 bg-white text-zinc-800 font-medium hover:bg-zinc-50 hover:border-zinc-300 transition-colors whitespace-nowrap tabular-nums"
+          >
+            <ListChecks className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+            <span>
+              월말 정리
+              {monthlyMigrationTasks.length > 0 &&
+                ` (${monthlyMigrationTasks.length})`}
+            </span>
+          </button>
         </div>
       </header>
 
@@ -397,6 +441,18 @@ export function MonthlyLogView({
           )}
         </section>
       </div>
+
+      {/* End-of-Month Migration Review Modal */}
+      <MonthlyMigrationModal
+        isOpen={migrationModalOpen}
+        monthKey={monthKey}
+        tasks={monthlyMigrationTasks}
+        onClose={() => setMigrationModalOpen(false)}
+        onMigrate={onMigrate}
+        onSchedule={onSchedule}
+        onToggleCancelled={onToggleCancelled}
+        onDelete={onDelete}
+      />
     </div>
   );
 }

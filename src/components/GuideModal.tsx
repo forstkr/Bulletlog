@@ -23,55 +23,93 @@ function MonoBadge({ children }: { children: ReactNode }) {
   );
 }
 
-const SYMBOLS_LIST: Array<{
+interface SymbolGuideItem {
+  id: string;
   symbol: string;
+  variant?: 'default' | 'cancelled' | 'priority';
   name: string;
   english: string;
-  meaning: string;
+  meaning: ReactNode;
   note?: string;
-  examples?: string[];
-}> = [
+  examples?: Array<{ text: string; style?: 'default' | 'cancelled' | 'priority' }>;
+}
+
+const SYMBOLS_LIST: SymbolGuideItem[] = [
   {
+    id: 'task',
     symbol: '•',
     name: '할 일',
     english: 'Task',
     meaning: '내가 직접 행동해서 끝내야 하는 일',
-    examples: ['• 세금 신고하기', '• 운동화 세탁 맡기기'],
+    examples: [{ text: '• 세금 신고하기' }, { text: '• 운동화 세탁 맡기기' }],
   },
   {
+    id: 'done',
     symbol: '×',
     name: '완료',
     english: 'Done',
     meaning: '할 일을 끝냈을 때 기호를 클릭해 완료 표시',
   },
   {
+    id: 'migrated',
     symbol: '>',
     name: '미루기',
     english: 'Migrated',
-    meaning: '오늘 못 끝냈지만 꼭 해야 해서 내일이나 다음 달 먼슬리 로그로 옮긴 일',
+    meaning:
+      '오늘 못 끝냈지만 꼭 해야 해서 내일이나 다음 달 먼슬리 로그로 옮긴 일',
   },
   {
+    id: 'scheduled',
     symbol: '<',
     name: '스케줄',
     english: 'Scheduled',
     meaning: '당장은 아니고 몇 달 뒤에 해야 해서 퓨처 로그로 보낸 일',
   },
   {
+    id: 'cancelled',
+    symbol: '•',
+    variant: 'cancelled',
+    name: '안 함 (취소선)',
+    english: 'Irrelevant',
+    meaning:
+      '중요하지 않아 의식적으로 포기한 일. 삭제 대신 취소선을 그어 완료(×)와 구분합니다.',
+    examples: [
+      { text: '• 안 읽는 뉴스레터 정리', style: 'cancelled' },
+    ],
+  },
+  {
+    id: 'priority',
+    symbol: '*',
+    variant: 'priority',
+    name: '중요 (시그니파이어)',
+    english: 'Priority',
+    meaning: (
+      <>
+        오늘 최우선으로 처리할 핵심 항목. 입력창 맨 앞에{' '}
+        <MonoBadge>* </MonoBadge>를 치거나 <MonoBadge>⋯</MonoBadge> 메뉴에서 켤 수
+        있습니다.
+      </>
+    ),
+    examples: [{ text: '• * 세금 신고하기', style: 'priority' }],
+  },
+  {
+    id: 'event',
     symbol: '○',
     name: '일정',
     english: 'Event',
     meaning: '날짜가 정해진 약속이나 기억할 만한 사건',
     note: '우리 앱에서는 구글 캘린더와 양방향 자동 연동됩니다.',
-    examples: ['○ 14:00 치과', '○ 프로젝트 발표 완료'],
+    examples: [{ text: '○ 14:00 치과' }, { text: '○ 프로젝트 발표 완료' }],
   },
   {
+    id: 'note',
     symbol: '-',
     name: '메모',
     english: 'Note',
     meaning: '아이디어, 사실, 잊지 말아야 할 정보, 짧은 감정 기록',
     examples: [
-      '- 오후 3시 이후엔 집중력이 떨어짐',
-      '- 점심 파스타 맛집 발견',
+      { text: '- 오후 3시 이후엔 집중력이 떨어짐' },
+      { text: '- 점심 파스타 맛집 발견' },
     ],
   },
 ];
@@ -82,14 +120,14 @@ const FOUR_LOGS = [
     title: '데일리 로그',
     subtitle: 'Daily Log · 매일 쓰는 메인 공간',
     description:
-      "아침부터 밤까지 떠오르는 할 일(•), 일정(○), 생각(-)을 순서 상관없이 바로바로 쏟아내는 곳입니다. 미래 날짜를 미리 채워두지 않고, 매일 '오늘' 분량만 기록합니다.",
+      "아침부터 밤까지 떠오르는 할 일(•), 일정(○), 생각(-)을 순서 상관없이 바로바로 쏟아내는 곳입니다. 미래 날짜를 미리 채워두지 않고 매일 '오늘' 분량만 기록하며, 오늘 화면 상단의 '이전 미완료 할 일' 배너로 어제 못 끝낸 일을 한 번에 검토할 수 있습니다.",
   },
   {
     step: '02',
     title: '먼슬리 로그',
     subtitle: 'Monthly Log · 한 달의 조감도',
     description:
-      '매달 1일에 이번 달의 큰 그림을 잡는 곳입니다. 왼쪽은 그달의 주요 일정 타임라인(○), 오른쪽은 "이번 달 안에 꼭 끝낼 할 일(•)" 목록으로 활용합니다.',
+      '매달 1일에 이번 달의 큰 그림을 잡는 곳입니다. 왼쪽은 그달의 주요 일정 타임라인(○), 오른쪽은 "이번 달 안에 꼭 끝낼 할 일(•)" 목록으로 활용하며, 우측 상단 \'월말 정리\' 버튼으로 그달 전체 미완료 할 일을 한 화면에서 마이그레이션할 수 있습니다.',
   },
   {
     step: '03',
@@ -116,7 +154,7 @@ const BEGINNER_TIPS = [
   {
     num: '02',
     title: '3번 이상 미룬(>) 할 일은 의심하세요',
-    body: '계속 미뤄지는 일은 ① 진짜 할 필요 없는 일이거나 ② 너무 커서 시작이 막막한 일입니다. 과감히 지우거나 "10분 만에 끝낼 첫 행동"으로 작게 쪼개보세요.',
+    body: '계속 미뤄지는 일은 ① 진짜 할 필요 없는 일이거나 ② 너무 커서 시작이 막막한 일입니다. 과감히 안 함(취소선)·삭제 처리하거나 "10분 만에 끝낼 첫 행동"으로 작게 쪼개보세요.',
   },
   {
     num: '03',
@@ -233,18 +271,28 @@ export function GuideModal({ isOpen, onClose }: GuideModalProps) {
 
               <div>
                 <h3 className="text-sm font-semibold text-zinc-900 mb-3">
-                  핵심 기호 6가지
+                  핵심 기호 &amp; 시그니파이어
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {SYMBOLS_LIST.map((item) => (
                     <div
-                      key={item.symbol}
+                      key={item.id}
                       className="rounded-xl border border-zinc-200/90 bg-white p-4 flex flex-col gap-2"
                     >
                       <div className="flex items-center gap-2.5">
-                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-100 border border-zinc-200 font-mono text-base font-semibold text-zinc-900 shrink-0">
-                          {item.symbol}
-                        </span>
+                        {item.variant === 'priority' ? (
+                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-amber-50 border border-amber-200 font-mono text-base font-semibold text-amber-600 shrink-0">
+                            {item.symbol}
+                          </span>
+                        ) : item.variant === 'cancelled' ? (
+                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-100 border border-zinc-200 font-mono text-base font-semibold text-neutral-400 line-through decoration-neutral-400 shrink-0">
+                            {item.symbol}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-zinc-100 border border-zinc-200 font-mono text-base font-semibold text-zinc-900 shrink-0">
+                            {item.symbol}
+                          </span>
+                        )}
                         <div className="min-w-0">
                           <span className="text-sm font-semibold text-zinc-900">
                             {item.name}
@@ -269,10 +317,26 @@ export function GuideModal({ isOpen, onClose }: GuideModalProps) {
                         <div className="mt-auto pt-2 border-t border-zinc-100 space-y-1">
                           {item.examples.map((ex) => (
                             <div
-                              key={ex}
-                              className="font-mono text-xs text-zinc-500"
+                              key={ex.text}
+                              className={`font-mono text-xs ${
+                                ex.style === 'cancelled'
+                                  ? 'line-through decoration-neutral-400 text-neutral-400'
+                                  : ex.style === 'priority'
+                                    ? 'text-zinc-800 font-medium'
+                                    : 'text-zinc-500'
+                              }`}
                             >
-                              {ex}
+                              {ex.style === 'priority' ? (
+                                <>
+                                  <span>• </span>
+                                  <span className="text-amber-600 font-semibold">
+                                    *
+                                  </span>
+                                  <span> 세금 신고하기</span>
+                                </>
+                              ) : (
+                                ex.text
+                              )}
                             </div>
                           ))}
                         </div>
@@ -284,7 +348,7 @@ export function GuideModal({ isOpen, onClose }: GuideModalProps) {
 
               <div className="rounded-xl border border-zinc-200 bg-zinc-50/70 p-4 sm:p-5">
                 <h3 className="text-sm font-semibold text-zinc-900 mb-3">
-                  Bulletlog 빠른 입력 단축키
+                  Bulletlog 빠른 입력 &amp; 편의 조작
                 </h3>
                 <ul className="space-y-2.5 text-xs sm:text-[13px] leading-relaxed text-zinc-700">
                   <li className="flex items-start gap-2.5">
@@ -292,25 +356,25 @@ export function GuideModal({ isOpen, onClose }: GuideModalProps) {
                       <MonoBadge>. </MonoBadge>
                     </span>
                     <span>
-                      입력창 맨 앞에 입력하면 할 일(<MonoBadge>•</MonoBadge>)로 자동 전환
+                      할 일(<MonoBadge>•</MonoBadge>)로 자동 전환
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <span className="shrink-0 pt-0.5">
+                      <MonoBadge>* </MonoBadge>
+                    </span>
+                    <span>
+                      중요 표시(<span className="font-mono font-semibold text-amber-600">*</span>)가 켜진 할 일로 바로 저장 (<MonoBadge>* . </MonoBadge>도 지원)
                     </span>
                   </li>
                   <li className="flex items-start gap-2.5">
                     <span className="shrink-0 pt-0.5 flex items-center gap-1">
                       <MonoBadge>o </MonoBadge>
-                      <span className="text-zinc-400">/</span>
-                      <MonoBadge>0 </MonoBadge>
+                      <span className="text-zinc-400">+</span>
+                      <MonoBadge>HH:mm </MonoBadge>
                     </span>
                     <span>
-                      입력창 맨 앞에 입력하면 일정(<MonoBadge>○</MonoBadge>)으로 자동 전환
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <span className="shrink-0 pt-0.5">
-                      <MonoBadge>o 14:30 치과</MonoBadge>
-                    </span>
-                    <span>
-                      <MonoBadge>HH:mm </MonoBadge> 시간을 앞에 쓰면 해당 시간 일정으로 구글 캘린더에 등록 (시간 없이 쓰면 종일 일정)
+                      일정(<MonoBadge>○</MonoBadge>) 자동 전환 + 구글 캘린더 양방향 자동 연동 (예: <MonoBadge>o 14:30 치과</MonoBadge>, 시간 미입력 시 종일 일정)
                     </span>
                   </li>
                   <li className="flex items-start gap-2.5">
@@ -318,7 +382,41 @@ export function GuideModal({ isOpen, onClose }: GuideModalProps) {
                       <MonoBadge>- </MonoBadge>
                     </span>
                     <span>
-                      입력창 맨 앞에 입력하면 메모(<MonoBadge>-</MonoBadge>)로 자동 전환
+                      메모(<MonoBadge>-</MonoBadge>)로 자동 전환
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <span className="shrink-0 pt-0.5 flex items-center gap-1">
+                      <MonoBadge>Tab</MonoBadge>
+                      <span className="text-zinc-400">/</span>
+                      <MonoBadge>Shift+Tab</MonoBadge>
+                    </span>
+                    <span>
+                      1단계 들여쓰기 토글 — 일정이나 큰 할 일 아래에 세부 메모·할 일을 묶어 정리 (입력창 및 항목 포커스·편집 중 모두 지원)
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <span className="shrink-0 pt-0.5">
+                      <MonoBadge>순서 변경</MonoBadge>
+                    </span>
+                    <span>
+                      PC에서는 항목 드래그 앤 드롭 또는 <MonoBadge>Alt + ↑↓</MonoBadge>, 모바일에서는 <MonoBadge>⋯</MonoBadge> 메뉴의 <MonoBadge>↑</MonoBadge> <MonoBadge>↓</MonoBadge> 버튼으로 순서 조정
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <span className="shrink-0 pt-0.5">
+                      <MonoBadge>⋯</MonoBadge>
+                    </span>
+                    <span>
+                      항목 우측 <MonoBadge>⋯</MonoBadge> 메뉴를 열면 중요·들여쓰기·순서 이동·미루기(<MonoBadge>&gt;</MonoBadge>)·스케줄(<MonoBadge>&lt;</MonoBadge>)·안 함(취소선)·수정·삭제 등 모든 기능을 한눈에 조작
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <span className="shrink-0 pt-0.5">
+                      <MonoBadge>실행 취소</MonoBadge>
+                    </span>
+                    <span>
+                      실수 방지: 항목 삭제 시 5초간 화면 하단에 <MonoBadge>실행 취소</MonoBadge> 토스트가 표시되어 구글 캘린더 일정까지 손실 없이 안전하게 복구 가능
                     </span>
                   </li>
                   <li className="flex items-start gap-2.5">
@@ -373,8 +471,9 @@ export function GuideModal({ isOpen, onClose }: GuideModalProps) {
                   <span className="font-medium text-zinc-900">데일리 로그(일간)</span>
                   <ArrowRight className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                   <span>
-                    월말에 남은 일은 다시 <MonoBadge>&gt;</MonoBadge> /{' '}
-                    <MonoBadge>&lt;</MonoBadge> 로 정리!
+                    월말에 남은 일은 <MonoBadge>월말 정리</MonoBadge>에서{' '}
+                    <MonoBadge>&gt;</MonoBadge> / <MonoBadge>&lt;</MonoBadge> /
+                    취소선으로 정리!
                   </span>
                 </p>
               </div>
@@ -401,8 +500,18 @@ export function GuideModal({ isOpen, onClose }: GuideModalProps) {
                     </h3>
                   </div>
                   <p className="mt-2 text-xs sm:text-sm leading-relaxed text-zinc-600">
-                    오늘 데일리 로그를 열고, 어제 못 끝낸 할 일(<MonoBadge>•</MonoBadge>) 중 오늘 실제로 할 것만{' '}
-                    <MonoBadge>&gt;</MonoBadge>(미루기)로 가져옵니다. 오늘 잡힌 일정(<MonoBadge>○</MonoBadge>)도 훑어봅니다.
+                    데일리 로그 상단에 자동으로 뜨는{' '}
+                    <strong className="font-semibold text-zinc-900">
+                      이전 미완료 할 일
+                    </strong>{' '}
+                    배너를 열어 오늘 실제로 할 것만{' '}
+                    <MonoBadge>오늘로 (&gt;)</MonoBadge> 가져옵니다. 그중 오늘
+                    최우선으로 끝낼 1~2개 항목에{' '}
+                    <strong className="font-semibold text-zinc-900">
+                      <span className="font-mono text-amber-600">*</span> 중요 표시
+                    </strong>
+                    를 켜고, 오늘 잡힌 일정(<MonoBadge>○</MonoBadge>)도 함께
+                    훑어봅니다.
                   </p>
                 </article>
 
@@ -444,8 +553,12 @@ export function GuideModal({ isOpen, onClose }: GuideModalProps) {
                     </h3>
                   </div>
                   <p className="mt-2 text-xs sm:text-sm leading-relaxed text-zinc-600">
-                    이번 달 데일리·먼슬리 로그를 훑어보며 완료(<MonoBadge>×</MonoBadge>)되지 않은{' '}
-                    <MonoBadge>•</MonoBadge> 항목마다 스스로에게 질문합니다:
+                    먼슬리 로그 우측 상단의{' '}
+                    <strong className="font-semibold text-zinc-900">
+                      월말 정리
+                    </strong>{' '}
+                    버튼을 눌러 한 달치 데일리·먼슬리 미완료(<MonoBadge>•</MonoBadge>)
+                    할 일을 한 화면에 모아보고, 항목마다 스스로에게 질문합니다:
                   </p>
                   <p className="mt-2.5 text-sm font-semibold text-zinc-900">
                     &ldquo;이 일이 정말 내 시간과 에너지를 쓸 가치가 있나?&rdquo;
@@ -454,21 +567,22 @@ export function GuideModal({ isOpen, onClose }: GuideModalProps) {
                     <li className="flex items-start gap-2">
                       <span className="font-mono text-zinc-400 shrink-0">-</span>
                       <span>
-                        가치 없다 → 죄책감 없이 과감히 <strong className="font-semibold text-zinc-900">삭제</strong> (불렛저널의 핵심은 할 일을 줄이는 것!)
-                      </span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="font-mono text-zinc-400 shrink-0">-</span>
-                      <span>
-                        다음 달에 해야 한다 → <MonoBadge>&gt;</MonoBadge> 눌러 다음 달{' '}
+                        다음 달에 해야 한다 → <MonoBadge>다음 달로 (&gt;)</MonoBadge> 눌러 다음 달{' '}
                         <strong className="font-semibold text-zinc-900">먼슬리 로그</strong>로 이동
                       </span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="font-mono text-zinc-400 shrink-0">-</span>
                       <span>
-                        몇 달 뒤에 해도 된다 → <MonoBadge>&lt;</MonoBadge> 눌러{' '}
+                        몇 달 뒤에 해도 된다 → <MonoBadge>퓨처 로그 (&lt;)</MonoBadge> 눌러 원하는 월의{' '}
                         <strong className="font-semibold text-zinc-900">퓨처 로그</strong>로 이동
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="font-mono text-zinc-400 shrink-0">-</span>
+                      <span>
+                        포기하기로 결정했다 → <MonoBadge>안 함 (취소선)</MonoBadge>으로 기록을 남기며 깔끔하게 정리하거나, 과감히{' '}
+                        <MonoBadge>삭제</MonoBadge> (불렛저널의 핵심은 할 일을 줄이는 것!)
                       </span>
                     </li>
                     <li className="flex items-start gap-2">
@@ -486,7 +600,7 @@ export function GuideModal({ isOpen, onClose }: GuideModalProps) {
           {/* TAB 4: 초보자 팁 */}
           {activeTab === 'tips' && (
             <div className="space-y-6">
-              {/* Authentic Daily Log Example Card */}
+              {/* Upgraded Authentic Daily Log Example Card */}
               <section className="rounded-xl border border-zinc-200 bg-white p-5">
                 <div className="pb-3 mb-3 border-b border-zinc-100 flex items-baseline justify-between gap-2">
                   <h3 className="text-sm font-semibold text-zinc-900">
@@ -495,56 +609,94 @@ export function GuideModal({ isOpen, onClose }: GuideModalProps) {
                   <span className="text-xs text-zinc-400">실제 작성 모습</span>
                 </div>
 
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-baseline gap-2.5">
-                    <span className="w-5 text-center font-mono text-zinc-400 shrink-0">
+                <ul className="space-y-2 text-[14px] leading-6">
+                  {/* × * 은행 이체하기 (중요 + 완료) */}
+                  <li className="flex items-start gap-2">
+                    <span className="w-7 h-6 flex items-center justify-center shrink-0 font-mono text-sm text-neutral-400">
                       ×
                     </span>
                     <span className="line-through text-zinc-400">
+                      <span className="text-neutral-400 font-semibold mr-1">*</span>
                       은행 이체하기
                     </span>
                   </li>
-                  <li className="flex items-baseline gap-2.5">
-                    <span className="w-5 text-center font-mono text-zinc-400 shrink-0">
+
+                  {/* > 이력서 초안 정리 (내일로 미룸) */}
+                  <li className="flex items-start gap-2">
+                    <span className="w-7 h-6 flex items-center justify-center shrink-0 font-mono text-sm text-neutral-400">
                       &gt;
                     </span>
                     <span className="text-zinc-400">
                       이력서 초안 정리 (내일로 미룸)
                     </span>
                   </li>
-                  <li className="flex items-baseline gap-2.5">
-                    <span className="w-5 text-center font-mono text-base font-semibold text-zinc-900 shrink-0">
-                      •
+
+                  {/* • * 저녁 장보기 (중요 + 진행 중) */}
+                  <li className="flex items-start gap-2">
+                    <span className="w-7 h-6 flex items-center justify-center shrink-0">
+                      <span
+                        aria-hidden="true"
+                        className="w-1.5 h-1.5 rounded-full bg-neutral-800"
+                      />
                     </span>
-                    <span className="text-zinc-900">
-                      저녁 장보기 (우유, 계란)
+                    <span className="font-medium text-neutral-950">
+                      <span className="text-amber-600 font-semibold mr-1">*</span>
+                      저녁 장보기
                     </span>
                   </li>
-                  <li className="flex items-baseline gap-2.5">
-                    <span className="w-5 text-center font-mono text-zinc-800 shrink-0">
-                      ○
+
+                  {/* ~~•~~ 안 읽는 뉴스레터 정리 (안 함 취소선) */}
+                  <li className="flex items-start gap-2">
+                    <span className="w-7 h-6 flex items-center justify-center shrink-0">
+                      <span
+                        aria-hidden="true"
+                        className="w-1.5 h-1.5 rounded-full bg-neutral-300"
+                      />
+                    </span>
+                    <span className="line-through decoration-neutral-400 text-neutral-400">
+                      안 읽는 뉴스레터 정리
+                    </span>
+                  </li>
+
+                  {/* ○ 14:00 팀 주간회의 */}
+                  <li className="flex items-start gap-2">
+                    <span className="w-7 h-6 flex items-center justify-center shrink-0">
+                      <span
+                        aria-hidden="true"
+                        className="w-2.5 h-2.5 rounded-full border-[1.5px] border-neutral-700"
+                      />
                     </span>
                     <span className="flex items-baseline gap-2 flex-wrap">
                       <span className="font-mono tabular-nums text-xs text-zinc-500">
                         14:00
                       </span>
-                      <span className="text-zinc-900">치과 정기검진</span>
+                      <span className="text-zinc-900">팀 주간회의</span>
                     </span>
                   </li>
-                  <li className="flex items-baseline gap-2.5">
-                    <span className="w-5 text-center font-mono text-zinc-500 shrink-0">
-                      -
+
+                  {/* (1단계 들여쓰기) - 11월 목표는 A안으로 확정됨 */}
+                  <li className="pl-7 flex items-start gap-2">
+                    <span className="w-7 h-6 flex items-center justify-center shrink-0">
+                      <span
+                        aria-hidden="true"
+                        className="w-2.5 h-[1.5px] rounded-full bg-neutral-500"
+                      />
                     </span>
                     <span className="text-zinc-600">
-                      아침에 할 일 3개만 적으니 훨씬 덜 지침
+                      11월 목표는 A안으로 확정됨
                     </span>
                   </li>
-                  <li className="flex items-baseline gap-2.5">
-                    <span className="w-5 text-center font-mono text-zinc-500 shrink-0">
-                      -
+
+                  {/* (1단계 들여쓰기) • 목요일까지 초안 공유하기 */}
+                  <li className="pl-7 flex items-start gap-2">
+                    <span className="w-7 h-6 flex items-center justify-center shrink-0">
+                      <span
+                        aria-hidden="true"
+                        className="w-1.5 h-1.5 rounded-full bg-neutral-800"
+                      />
                     </span>
-                    <span className="text-zinc-600">
-                      다음 주 팀 미팅 때 자동화 아이디어 제안해보기
+                    <span className="text-zinc-900">
+                      목요일까지 초안 공유하기
                     </span>
                   </li>
                 </ul>
@@ -553,7 +705,7 @@ export function GuideModal({ isOpen, onClose }: GuideModalProps) {
               {/* 4 Beginner Mistakes & Tips */}
               <div>
                 <h3 className="text-sm font-semibold text-zinc-900 mb-3">
-                  초보자가 가장 많이 하는 실수 & 극복 팁
+                  초보자가 가장 많이 하는 실수 &amp; 극복 팁
                 </h3>
                 <div className="space-y-3">
                   {BEGINNER_TIPS.map((tip) => (
